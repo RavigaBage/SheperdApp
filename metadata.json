@@ -1,0 +1,6 @@
+{
+  "name": "Shepherd",
+  "description": "A premium document management and ministry productivity app designed specifically for pastors.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
