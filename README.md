@@ -1,21 +1,204 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
+
+# ShepherdApp
+
+### 📖 The Digital Ministry Companion for Pastors
+
+*Prepare. Organize. Study. Preach.*
+
+ShepherdApp is an AI-powered Android application designed to help pastors, ministers, teachers, and church leaders manage every stage of sermon preparation and ministry from one place.
+
+---
+
 </div>
 
-# Run and deploy your AI Studio app
+## ✨ Features
 
-This contains everything you need to run your app locally.
+### 📚 Sermon Organizer
 
-View your app in AI Studio: https://ai.studio/apps/2f15b7af-09da-4b6f-9055-cec50b63df42
+Keep every sermon, teaching, and Bible study neatly organized.
 
-## Run Locally
+* Create sermon series
+* Organize teachings by topic, book, season, or event
+* Categorize seminars and conference notes
+* Quickly search through your ministry library
 
-**Prerequisites:**  [Android Studio](https://developer.android.com/studio)
+---
 
+### 🤖 AI Writing Assistant
 
-1. Open Android Studio
-2. Select **Open** and choose the directory containing this project
-3. Allow Android Studio to fix any incompatibilities as it imports the project.
-4. Create a file named `.env` in the project directory and set `GEMINI_API_KEY` in that file to your Gemini API key (see `.env.example` for an example)
-5. Remove this line from the app's `build.gradle.kts` file: `signingConfig = signingConfigs.getByName("debugConfig")`
-6. Run the app on an emulator or physical device
+Transform rough ideas into polished ministry content.
+
+Use AI to:
+
+* Improve sermon drafts
+* Rewrite devotionals
+* Expand outlines into complete sermons
+* Simplify difficult theological concepts
+* Generate titles and key points
+* Refine seminars and Bible study notes
+
+---
+
+### 🎤 Preach Mode
+
+A distraction-free preaching experience.
+
+* Clean presentation interface
+* Large readable text
+* Quick navigation through sermon points
+* Designed for use from the pulpit
+
+---
+
+### 📖 Study Board
+
+A dedicated workspace for Bible study and sermon preparation.
+
+* Build sermon outlines
+* Record study notes
+* Collect references
+* Organize research in one place
+
+---
+
+### 📅 Ministry Calendar
+
+Never lose track of ministry events.
+
+Schedule:
+
+* Church services
+* Conferences
+* Prayer meetings
+* Bible studies
+* Counseling appointments
+* Ministry deadlines
+
+---
+
+### 📄 Document Viewer
+
+Open and review ministry documents directly inside the app.
+
+Perfect for:
+
+* Sermons
+* Seminar notes
+* Lesson plans
+* Church documents
+
+---
+
+### 🕘 History
+
+Every AI interaction and document revision is automatically stored, making it easy to revisit previous work whenever needed.
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+Before running the project, ensure you have:
+
+* Android Studio (latest stable version)
+* Android SDK
+* A valid Gemini API Key
+
+---
+
+## Installation
+
+1. Clone the repository
+
+```bash
+git clone https://github.com/yourusername/ShepherdApp.git
+```
+
+2. Open Android Studio.
+
+3. Select **Open Existing Project**.
+
+4. Choose the cloned project folder.
+
+5. Allow Android Studio to finish indexing and install any required dependencies.
+
+6. Create a `.env` file in the project root.
+
+```env
+GEMINI_API_KEY=YOUR_API_KEY
+```
+
+See `.env.example` for the expected format.
+
+7. Remove the following line from:
+
+```
+app/build.gradle.kts
+```
+
+```kotlin
+signingConfig = signingConfigs.getByName("debugConfig")
+```
+
+8. Build and run the application on an Android emulator or physical device.
+
+---
+
+## 🛠 Built With
+
+* Kotlin
+* Jetpack Compose
+* Android Studio
+* Google Gemini API
+* Material Design 3
+
+---
+
+## 📱 Vision
+
+ShepherdApp exists to simplify sermon preparation and ministry administration through thoughtful design and modern AI.
+
+Instead of juggling multiple note-taking apps, calendars, document editors, and AI tools, ShepherdApp brings everything together into a single ministry workspace where pastors can prepare messages, organize teachings, plan events, study Scripture, and preach with confidence.
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome!
+
+If you'd like to improve ShepherdApp:
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Open a Pull Request
+
+---
+
+## 🔒 Environment Variables
+
+Create a `.env` file containing:
+
+```env
+GEMINI_API_KEY=YOUR_API_KEY
+```
+
+Your API key should never be committed to source control.
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License. See the `LICENSE` file for details.
+
+---
+
+<div align="center">
+
+**Helping pastors spend less time managing files and more time shepherding people.**
+
+Made with ❤️ for ministry.
+
+</div>
