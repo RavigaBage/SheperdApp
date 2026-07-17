@@ -18,6 +18,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
 import androidx.ink.authoring.compose.InProgressStrokes
 import androidx.ink.brush.Brush
 import androidx.ink.brush.InputToolType
@@ -53,7 +60,6 @@ fun InkCanvas(
     onSelectedObjectChange: (String?) -> Unit = {}
 ) {
     val density = LocalDensity.current
-    val densityValue = density.density
     val strokeRenderer = remember { CanvasStrokeRenderer.create() }
     
     val currentBrush = remember(brushColor, brushSize, canvasMode, penType) {
@@ -84,7 +90,6 @@ fun InkCanvas(
 
     // Stability for callbacks
     val updatedObjects by rememberUpdatedState(objects)
-    val updatedFinishedStrokes by rememberUpdatedState(finishedStrokes)
     val updatedBrushColor by rememberUpdatedState(brushColor)
     val updatedBrushSize by rememberUpdatedState(brushSize)
     val updatedOnStrokeFinished by rememberUpdatedState(onStrokeFinished)
@@ -96,11 +101,10 @@ fun InkCanvas(
 
     Box(modifier = modifier.fillMaxSize()) {
         // LAYER 1: Unified Rendering
-        // For performance, we draw the background and all current strokes in one Canvas
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawIntoCanvas { composeCanvas ->
                 val androidCanvas = composeCanvas.nativeCanvas
-                PageBackgroundRenderer.draw(androidCanvas, size.width, size.height, backgroundStyle, density)
+                PageBackgroundRenderer.draw(androidCanvas, size.width, size.height, backgroundStyle, density.density)
 
                 // Draw strokes in Z-order
                 objects.filterIsInstance<CanvasObject.StrokeObject>().forEach { strokeObj ->
@@ -141,7 +145,6 @@ fun InkCanvas(
                             )
                     )
                 }
-                // ImageObject and IllustrationObject would be here
                 else -> {}
             }
         }
@@ -260,7 +263,7 @@ fun InkCanvas(
 fun FormattingToolbar(
     textObject: CanvasObject.RichTextObject,
     onUpdate: (CanvasObject.RichTextObject) -> Unit,
-    density: androidx.compose.ui.unit.Density
+    density: Density
 ) {
     val xDp = with(density) { textObject.x.toDp() }
     val yDp = with(density) { (textObject.y - 50f).toDp() }
@@ -328,274 +331,7 @@ fun SelectionOverlay(
     height: Float,
     onResize: (dx: Float, dy: Float, dw: Float, dh: Float) -> Unit,
     onRemove: () -> Unit,
-    density: androidx.compose.ui.unit.Density
-) {
-    val xDp = with(density) { x.toDp() }
-    val yDp = with(density) { y.toDp() }
-    val widthDp = with(density) { width.toDp() }
-    val heightDp = with(density) { height.toDp() }
-
-    Box(
-        modifier = Modifier
-            .offset(xDp, yDp)
-            .size(widthDp, heightDp)
-    ) {
-        // Main bounding box (visual only)
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp))
-        )
-
-        // Delete button (Top Right)
-        IconButton(
-            onClick = onRemove,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .offset(8.dp, (-8).dp)
-                .size(24.dp)
-                .background(MaterialTheme.colorScheme.error, RoundedCornerShape(12.dp))
-        ) {
-            Icon(Icons.Default.Close, contentDescription = "Remove", tint = Color.White, modifier = Modifier.size(16.dp))
-        }
-
-        // Resize handles (4 corners)
-        ResizeHandle(Alignment.TopStart, onResize = { dx, dy -> onResize(dx, dy, -dx, -dy) })
-        ResizeHandle(Alignment.TopEnd, onResize = { dx, dy -> onResize(0f, dy, dx, -dy) })
-        ResizeHandle(Alignment.BottomStart, onResize = { dx, dy -> onResize(dx, 0f, -dx, dy) })
-        ResizeHandle(Alignment.BottomEnd, onResize = { dx, dy -> onResize(0f, 0f, dx, dy) })
-    }
-}
-
-@Composable
-fun BoxScope.ResizeHandle(
-    alignment: Alignment,
-    onResize: (Float, Float) -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .size(16.dp)
-            .align(alignment)
-            .offset(
-                x = if (alignment == Alignment.TopStart || alignment == Alignment.BottomStart) (-8).dp else 8.dp,
-                y = if (alignment == Alignment.TopStart || alignment == Alignment.TopEnd) (-8).dp else 8.dp
-            )
-            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))
-            .pointerInput(Unit) {
-                detectDragGestures { change, dragAmount ->
-                    change.consume()
-                    onResize(dragAmount.x, dragAmount.y)
-                }
-            }
-    )
-}
-
-private data class Rect(val x: Float, val y: Float, val width: Float, val height: Float)
-    textObject: CanvasObject.RichTextObject,
-    onUpdate: (CanvasObject.RichTextObject) -> Unit,
-    density: androidx.compose.ui.unit.Density
-) {
-    val xDp = with(density) { textObject.x.toDp() }
-    val yDp = with(density) { (textObject.y - 50f).toDp() }
-
-    Surface(
-        modifier = Modifier
-            .offset(xDp, yDp)
-            .wrapContentSize(),
-        shape = RoundedCornerShape(8.dp),
-        tonalElevation = 4.dp,
-        shadowElevation = 4.dp
-    ) {
-        Row(modifier = Modifier.padding(4.dp)) {
-            IconButton(onClick = { onUpdate(textObject.copy(isBold = !textObject.isBold)) }) {
-                Icon(
-                    Icons.Default.FormatBold,
-                    contentDescription = "Bold",
-                    tint = if (textObject.isBold) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                )
-            }
-            IconButton(onClick = { onUpdate(textObject.copy(isItalic = !textObject.isItalic)) }) {
-                Icon(
-                    Icons.Default.FormatItalic,
-                    contentDescription = "Italic",
-                    tint = if (textObject.isItalic) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                )
-            }
-            IconButton(onClick = { 
-                val lines = textObject.text.lines()
-                val isBullet = lines.all { it.trimStart().startsWith("• ") }
-                val newText = if (isBullet) {
-                    lines.joinToString("\n") { it.trimStart().removePrefix("• ") }
-                } else {
-                    lines.joinToString("\n") { "• $it" }
-                }
-                onUpdate(textObject.copy(text = newText))
-            }) {
-                Icon(Icons.Default.FormatListBulleted, contentDescription = "Bullet List")
-            }
-            IconButton(onClick = {
-                val lines = textObject.text.lines()
-                val isNumbered = lines.firstOrNull()?.trimStart()?.let { 
-                    it.isNotEmpty() && it[0].isDigit() && it.contains(". ")
-                } ?: false
-                
-                val newText = if (isNumbered) {
-                    lines.joinToString("\n") { it.replaceFirst(Regex("^\\s*\\d+\\.\\s*"), "") }
-                } else {
-                    lines.mapIndexed { index, s -> "${index + 1}. $s" }.joinToString("\n")
-                }
-                onUpdate(textObject.copy(text = newText))
-            }) {
-                Icon(Icons.Default.FormatListNumbered, contentDescription = "Numbered List")
-            }
-        }
-    }
-}
-
-@Composable
-fun SelectionOverlay(
-    id: String,
-    x: Float,
-    y: Float,
-    width: Float,
-    height: Float,
-    onResize: (dx: Float, dy: Float, dw: Float, dh: Float) -> Unit,
-    onRemove: () -> Unit,
-    density: androidx.compose.ui.unit.Density
-) {
-    val xDp = with(density) { x.toDp() }
-    val yDp = with(density) { y.toDp() }
-    val widthDp = with(density) { width.toDp() }
-    val heightDp = with(density) { height.toDp() }
-
-    Box(
-        modifier = Modifier
-            .offset(xDp, yDp)
-            .size(widthDp, heightDp)
-    ) {
-        // Main bounding box (visual only)
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp))
-        )
-
-        // Delete button (Top Right)
-        IconButton(
-            onClick = onRemove,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .offset(8.dp, (-8).dp)
-                .size(24.dp)
-                .background(MaterialTheme.colorScheme.error, RoundedCornerShape(12.dp))
-        ) {
-            Icon(Icons.Default.Close, contentDescription = "Remove", tint = Color.White, modifier = Modifier.size(16.dp))
-        }
-
-        // Resize handles (4 corners)
-        ResizeHandle(Alignment.TopStart, onResize = { dx, dy -> onResize(dx, dy, -dx, -dy) })
-        ResizeHandle(Alignment.TopEnd, onResize = { dx, dy -> onResize(0f, dy, dx, -dy) })
-        ResizeHandle(Alignment.BottomStart, onResize = { dx, dy -> onResize(dx, 0f, -dx, dy) })
-        ResizeHandle(Alignment.BottomEnd, onResize = { dx, dy -> onResize(0f, 0f, dx, dy) })
-    }
-}
-
-@Composable
-fun BoxScope.ResizeHandle(
-    alignment: Alignment,
-    onResize: (Float, Float) -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .size(16.dp)
-            .align(alignment)
-            .offset(
-                x = if (alignment == Alignment.TopStart || alignment == Alignment.BottomStart) (-8).dp else 8.dp,
-                y = if (alignment == Alignment.TopStart || alignment == Alignment.TopEnd) (-8).dp else 8.dp
-            )
-            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))
-            .pointerInput(Unit) {
-                detectDragGestures { change, dragAmount ->
-                    change.consume()
-                    onResize(dragAmount.x, dragAmount.y)
-                }
-            }
-    )
-}
-
-@Composable
-fun FormattingToolbar(
-    textObject: CanvasObject.RichTextObject,
-    onUpdate: (CanvasObject.RichTextObject) -> Unit,
-    density: androidx.compose.ui.unit.Density
-) {
-    val xDp = with(density) { textObject.x.toDp() }
-    val yDp = with(density) { (textObject.y - 50f).toDp() }
-
-    Surface(
-        modifier = Modifier
-            .offset(xDp, yDp)
-            .wrapContentSize(),
-        shape = RoundedCornerShape(8.dp),
-        tonalElevation = 4.dp,
-        shadowElevation = 4.dp
-    ) {
-        Row(modifier = Modifier.padding(4.dp)) {
-            IconButton(onClick = { onUpdate(textObject.copy(isBold = !textObject.isBold)) }) {
-                Icon(
-                    Icons.Default.FormatBold,
-                    contentDescription = "Bold",
-                    tint = if (textObject.isBold) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                )
-            }
-            IconButton(onClick = { onUpdate(textObject.copy(isItalic = !textObject.isItalic)) }) {
-                Icon(
-                    Icons.Default.FormatItalic,
-                    contentDescription = "Italic",
-                    tint = if (textObject.isItalic) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                )
-            }
-            IconButton(onClick = { 
-                val lines = textObject.text.lines()
-                val isBullet = lines.all { it.trimStart().startsWith("• ") }
-                val newText = if (isBullet) {
-                    lines.joinToString("\n") { it.trimStart().removePrefix("• ") }
-                } else {
-                    lines.joinToString("\n") { "• $it" }
-                }
-                onUpdate(textObject.copy(text = newText))
-            }) {
-                Icon(Icons.Default.FormatListBulleted, contentDescription = "Bullet List")
-            }
-            IconButton(onClick = {
-                val lines = textObject.text.lines()
-                val isNumbered = lines.firstOrNull()?.trimStart()?.let { 
-                    it.isNotEmpty() && it[0].isDigit() && it.contains(". ")
-                } ?: false
-                
-                val newText = if (isNumbered) {
-                    lines.joinToString("\n") { it.replaceFirst(Regex("^\\s*\\d+\\.\\s*"), "") }
-                } else {
-                    lines.mapIndexed { index, s -> "${index + 1}. $s" }.joinToString("\n")
-                }
-                onUpdate(textObject.copy(text = newText))
-            }) {
-                Icon(Icons.Default.FormatListNumbered, contentDescription = "Numbered List")
-            }
-        }
-    }
-}
-
-@Composable
-fun SelectionOverlay(
-    id: String,
-    x: Float,
-    y: Float,
-    width: Float,
-    height: Float,
-    onResize: (dx: Float, dy: Float, dw: Float, dh: Float) -> Unit,
-    onRemove: () -> Unit,
-    density: androidx.compose.ui.unit.Density
+    density: Density
 ) {
     val xDp = with(density) { x.toDp() }
     val yDp = with(density) { y.toDp() }
