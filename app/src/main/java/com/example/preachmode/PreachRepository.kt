@@ -95,7 +95,7 @@ Steps:
 
             // 3. Call Gemini
             val model = GenerativeModel(
-                modelName = "gemini-3.5-flash",
+                modelName = "gemini-2.5-flash",
                 apiKey = apiKey
             )
 

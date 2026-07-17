@@ -75,6 +75,7 @@ class MainActivity : ComponentActivity() {
                         NavHost(
                             navController = navController,
                             startDestination = startDestination,
+
                             modifier = Modifier.padding(innerPadding)
                         ) {
                             composable("onboarding") {
@@ -136,6 +137,12 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
+                        composable("trash") {
+                            TrashScreen(
+                                viewModel = appViewModel,
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
 
                         composable("ai_editor") {
                             AiEditorScreen(
@@ -173,9 +180,66 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable("notes") {
-                            NotesScreen(
-                                viewModel = appViewModel,
-                                onBack = { navController.popBackStack() }
+                            com.example.notes.ui.NotebookListScreen(
+                                onBack = { navController.popBackStack() },
+                                onNavigateToPage = { pageId, notebookId ->
+                                    navController.navigate("notes/$notebookId/$pageId")
+                                },
+                                onNavigateToPreach = { notebookId, title ->
+                                    appViewModel.activeViewerSermonId = notebookId
+                                    appViewModel.activeViewerFilePath = ""
+                                    appViewModel.activeViewerTitle = title
+                                    appViewModel.activeViewerIsNote = true
+                                    appViewModel.activeViewerIsNotebookScope = true
+                                    appViewModel.livePreachDurationMinutes = 30
+                                    navController.navigate("preach_mode")
+                                }
+                            )
+                        }
+
+                        composable("notes/{notebookId}/{pageId}") { backStackEntry ->
+                            val notebookId = backStackEntry.arguments?.getString("notebookId") ?: return@composable
+                            val pageId = backStackEntry.arguments?.getString("pageId") ?: "default-page"
+                            val pendingText = backStackEntry.savedStateHandle.get<String>("insert_text")
+                            com.example.notes.ui.NotesScreen(
+                                pageId = pageId,
+                                notebookId = notebookId,
+                                pendingInsertText = pendingText,
+                                onClearPendingInsertText = {
+                                    backStackEntry.savedStateHandle.remove<String>("insert_text")
+                                },
+                                onBack = { navController.popBackStack() },
+                                onNavigateToPreach = { duration ->
+                                    appViewModel.activeViewerSermonId = pageId
+                                    appViewModel.activeViewerFilePath = ""
+                                    appViewModel.activeViewerTitle = "Page Note"
+                                    appViewModel.activeViewerIsNote = true
+                                    appViewModel.activeViewerIsNotebookScope = false
+                                    appViewModel.livePreachDurationMinutes = duration
+                                    navController.navigate("preach_mode")
+                                },
+                                onNavigateToLibrary = {
+                                    navController.navigate("illustration_library")
+                                }
+                            )
+                        }
+
+                        composable("illustration_library") {
+                            com.example.notes.ui.IllustrationLibraryScreen(
+                                onBack = { navController.popBackStack() },
+                                onInsertIllustration = { illustration ->
+                                    navController.previousBackStackEntry?.savedStateHandle?.set("insert_text", illustration.bodyText)
+                                    navController.popBackStack()
+                                }
+                            )
+                        }
+
+                        composable("sermon_ideas") {
+                            com.example.notes.ui.SermonIdeaBrowseScreen(
+                                onBack = { navController.popBackStack() },
+                                onNavigateToPage = { pageId, notebookId ->
+                                    navController.navigate("notes/$notebookId/$pageId")
+                                }
                             )
                         }
 
@@ -234,9 +298,13 @@ class MainActivity : ComponentActivity() {
 
                         composable("preach_mode") {
                             PreachModeScreen(
+                                viewModel = appViewModel,
                                 filePath = appViewModel.activeViewerFilePath,
                                 sermonTitle = appViewModel.activeViewerTitle,
                                 durationMinutes = appViewModel.livePreachDurationMinutes,
+                                isNote = appViewModel.activeViewerIsNote,
+                                isNotebookScope = appViewModel.activeViewerIsNotebookScope,
+                                sermonId = appViewModel.activeViewerSermonId,
                                 onBack = { navController.popBackStack() }
                             )
                         }

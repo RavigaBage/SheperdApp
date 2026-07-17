@@ -55,15 +55,15 @@ fun OnboardingScreen(
 
     val gradient = Brush.verticalGradient(
         colors = listOf(
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-            MaterialTheme.colorScheme.background
+            Color.White,
+            Color.White
         )
     )
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(gradient)
+            .background(Color.White)
     ) {
         // Skip Button top right
         TextButton(

@@ -15,11 +15,21 @@ enum class FormatMode {
 
 class GeminiService {
 
-    private val apiKey: String = try {
-        BuildConfig.GEMINI_API_KEY
-    } catch (e: Throwable) {
-        ""
+    private fun getEffectiveApiKey(providedKey: String): String {
+        return when {
+            providedKey.isNotBlank() -> providedKey
+            else -> try {
+                BuildConfig.GEMINI_API_KEY
+            } catch (e: Throwable) {
+                ""
+            }
+        }
     }
+
+    private fun getApiModel(): String {
+        return if (!BuildConfig.GEMINI_MODEL.isNullOrEmpty()) BuildConfig.GEMINI_MODEL else "gemini-3.5-flash"
+    }
+
 
     private fun getSystemPrompt(mode: FormatMode): String {
         return when (mode) {
@@ -115,8 +125,10 @@ Provide only the corrected and polished text outputs.
         }
     }
 
-    fun formatDocumentStream(rawText: String, mode: FormatMode): Flow<String> = flow {
-        if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
+    fun formatDocumentStream(rawText: String, mode: FormatMode, apiKey: String = ""): Flow<String> = flow {
+        val key = getEffectiveApiKey(apiKey)
+        val model_api = getApiModel()
+        if (key.isEmpty() || key == "MY_GEMINI_API_KEY") {
             emit("API KEY ERROR: Please open Settings and enter your valid Gemini API Key to enable premium formatting capabilities.")
             return@flow
         }
@@ -127,8 +139,8 @@ Provide only the corrected and polished text outputs.
             
             // Initialise Gemini Model
             val model = GenerativeModel(
-                modelName = "gemini-1.5-flash",
-                apiKey = apiKey
+                modelName = model_api,
+                apiKey = key
             )
 
             // Stream response
@@ -143,8 +155,10 @@ Provide only the corrected and polished text outputs.
         }
     }.flowOn(Dispatchers.IO)
 
-    fun getUrielWordInsightStream(word: String, type: String, customPrompt: String = ""): Flow<String> = flow {
-        if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
+    fun getUrielWordInsightStream(word: String, type: String, customPrompt: String = "", apiKey: String = ""): Flow<String> = flow {
+        val key = getEffectiveApiKey(apiKey)
+        val model_api = getApiModel()
+        if (key.isEmpty() || key == "MY_GEMINI_API_KEY") {
             emit("API KEY ERROR: Please open Settings and enter your valid Gemini API Key to enable Uriel's assistance.")
             return@flow
         }
@@ -167,8 +181,8 @@ Provide only the corrected and polished text outputs.
             """.trimIndent()
 
             val model = GenerativeModel(
-                modelName = "gemini-1.5-flash",
-                apiKey = apiKey
+                modelName = model_api,
+                apiKey = key
             )
 
             val fullPrompt = "$systemInstruction\n\nWord/Phrase: $word"
@@ -183,8 +197,10 @@ Provide only the corrected and polished text outputs.
         }
     }.flowOn(Dispatchers.IO)
 
-    fun getUrielScriptureIntelligenceStream(scriptureRef: String, type: String): Flow<String> = flow {
-        if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
+    fun getUrielScriptureIntelligenceStream(scriptureRef: String, type: String, apiKey: String = ""): Flow<String> = flow {
+        val key = getEffectiveApiKey(apiKey)
+        val model_api = getApiModel()
+        if (key.isEmpty() || key == "MY_GEMINI_API_KEY") {
             emit("API KEY ERROR: Please open Settings and enter your valid Gemini API Key to enable Uriel's assistance.")
             return@flow
         }
@@ -205,8 +221,8 @@ Provide only the corrected and polished text outputs.
             """.trimIndent()
 
             val model = GenerativeModel(
-                modelName = "gemini-1.5-flash",
-                apiKey = apiKey
+                modelName = model_api,
+                apiKey = key
             )
 
             val fullPrompt = "$systemInstruction\n\nScripture: $scriptureRef"
@@ -221,8 +237,10 @@ Provide only the corrected and polished text outputs.
         }
     }.flowOn(Dispatchers.IO)
 
-    fun getUrielThemeDraftStream(topic: String): Flow<String> = flow {
-        if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
+    fun getUrielThemeDraftStream(topic: String, apiKey: String = ""): Flow<String> = flow {
+        val key = getEffectiveApiKey(apiKey)
+        val model_api = getApiModel()
+        if (key.isEmpty() || key == "MY_GEMINI_API_KEY") {
             emit("API KEY ERROR: Please open Settings and enter your valid Gemini API Key to enable Uriel's assistance.")
             return@flow
         }
@@ -241,8 +259,8 @@ Provide only the corrected and polished text outputs.
             """.trimIndent()
 
             val model = GenerativeModel(
-                modelName = "gemini-1.5-flash",
-                apiKey = apiKey
+                modelName = model_api,
+                apiKey = key
             )
 
             val fullPrompt = "$systemInstruction\n\nTopic/Story: $topic"

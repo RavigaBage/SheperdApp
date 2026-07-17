@@ -149,6 +149,9 @@ class ShepherdViewModel(
     var activeViewerSermonId by androidx.compose.runtime.mutableStateOf("")
     var activeViewerFilePath by androidx.compose.runtime.mutableStateOf("")
     var activeViewerTitle by androidx.compose.runtime.mutableStateOf("")
+    var activeViewerIsNote by androidx.compose.runtime.mutableStateOf(false)
+    var activeViewerIsNotebookScope by androidx.compose.runtime.mutableStateOf(false)
+    var activeViewerAttachmentUris by androidx.compose.runtime.mutableStateOf<List<String>>(emptyList())
 
     var livePreachDurationMinutes by androidx.compose.runtime.mutableStateOf(45)
     var livePreachScrollSpeed by androidx.compose.runtime.mutableStateOf(2)
@@ -447,54 +450,6 @@ class ShepherdViewModel(
         }
     }
 
-    fun savePastoralNote(
-        title: String,
-        text: String,
-        strokes: List<DrawingStroke>,
-        noteType: NoteType,
-        exportAsDocx: Boolean,
-        onComplete: (docxPath: String?) -> Unit
-    ) {
-        viewModelScope.launch {
-            val docxPath = repository.savePastoralNote(title, text, strokes, noteType, exportAsDocx)
-            syncFiles()
-            onComplete(docxPath)
-        }
-    }
-
-    // --- Quick Note State & Autosave ---
-    private val _quickNoteDraft = MutableStateFlow(
-        application.getSharedPreferences("shepherd_prefs", Application.MODE_PRIVATE)
-            .getString("quick_note_draft", "") ?: ""
-    )
-    val quickNoteDraft: StateFlow<String> = _quickNoteDraft.asStateFlow()
-
-    init {
-        // Autosave Quick Note draft every 20 seconds if changed
-        viewModelScope.launch {
-            var lastSavedText = _quickNoteDraft.value
-            while (true) {
-                delay(20000)
-                val currentText = _quickNoteDraft.value
-                if (currentText != lastSavedText) {
-                    application.getSharedPreferences("shepherd_prefs", Application.MODE_PRIVATE)
-                        .edit().putString("quick_note_draft", currentText).apply()
-                    lastSavedText = currentText
-                }
-            }
-        }
-    }
-
-    fun updateQuickNoteDraft(text: String) {
-        _quickNoteDraft.value = text
-    }
-
-    fun discardQuickNote() {
-        _quickNoteDraft.value = ""
-        application.getSharedPreferences("shepherd_prefs", Application.MODE_PRIVATE)
-            .edit().remove("quick_note_draft").apply()
-    }
-
     // --- Settings and Polish ---
     private val _themeMode = MutableStateFlow(repository.getThemeMode())
     val themeMode: StateFlow<String> = _themeMode.asStateFlow()
@@ -510,6 +465,9 @@ class ShepherdViewModel(
 
     private val _bibleVer = MutableStateFlow(repository.getBibleVersion())
     val bibleVer: StateFlow<String> = _bibleVer.asStateFlow()
+
+    private val _geminiApiKey = MutableStateFlow(repository.getGeminiApiKey())
+    val geminiApiKey: StateFlow<String> = _geminiApiKey.asStateFlow()
 
     fun updateThemeMode(mode: String) {
         repository.setThemeMode(mode)
@@ -534,6 +492,11 @@ class ShepherdViewModel(
     fun updateBibleVersion(ver: String) {
         repository.setBibleVersion(ver)
         _bibleVer.value = ver
+    }
+
+    fun updateGeminiApiKey(key: String) {
+        repository.setGeminiApiKey(key)
+        _geminiApiKey.value = key
     }
 
     // --- Base File System Queries ---
@@ -707,7 +670,23 @@ class ShepherdViewModel(
 
     private val _documentLoadingStatus = MutableStateFlow("")
     val documentLoadingStatus: StateFlow<String> = _documentLoadingStatus.asStateFlow()
+    private val _tableResult = MutableStateFlow("")
+    val tableResult: StateFlow<String> = _tableResult.asStateFlow()
 
+    private val _tableIsGenerating = MutableStateFlow(false)
+    val tableIsGenerating: StateFlow<Boolean> = _tableIsGenerating.asStateFlow()
+
+    fun generateTableFromText(sourceText: String, instruction: String) {
+        if (instruction.trim().isEmpty()) return
+        _tableResult.value = ""
+        _tableIsGenerating.value = true
+        viewModelScope.launch {
+            repository.getTableStream(sourceText, instruction).collect { chunk ->
+                _tableResult.value = _tableResult.value + chunk
+            }
+            _tableIsGenerating.value = false
+        }
+    }
     fun loadDocumentFromUri(sermonId: String, uriString: String, title: String) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             _isDocumentLoading.emit(true)
@@ -754,6 +733,14 @@ class ShepherdViewModel(
     }
 
     fun loadDocument(sermonId: String, filePath: String, title: String) {
+        // Guard: if a content:// URI slips in here (e.g. from a call site that
+        // hasn't been updated to use loadDocumentFromUri), redirect automatically
+        // instead of silently failing the "file.exists()" check below.
+        if (filePath.startsWith("content://")) {
+            loadDocumentFromUri(sermonId, filePath, title)
+            return
+        }
+
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             _isDocumentLoading.emit(true)
             _documentLoadingStatus.emit("Reading file structure...")
@@ -821,33 +808,6 @@ class ShepherdViewModel(
         }
     }
 
-    // --- Stylus Drawing Notebook State ---
-    private val _notebookStrokes = MutableStateFlow<List<DrawingStroke>>(emptyList())
-    val notebookStrokes: StateFlow<List<DrawingStroke>> = _notebookStrokes.asStateFlow()
-
-    fun addStroke(stroke: DrawingStroke) {
-        _notebookStrokes.value = _notebookStrokes.value + stroke
-    }
-
-    fun updateLastStroke(points: List<androidx.compose.ui.geometry.Offset>) {
-        val strokes = _notebookStrokes.value
-        if (strokes.isNotEmpty()) {
-            val last = strokes.last()
-            _notebookStrokes.value = strokes.dropLast(1) + last.copy(points = points)
-        }
-    }
-
-    fun clearNotebookStrokes() {
-        _notebookStrokes.value = emptyList()
-    }
-
-    fun undoLastStroke() {
-        val strokes = _notebookStrokes.value
-        if (strokes.isNotEmpty()) {
-            _notebookStrokes.value = strokes.dropLast(1)
-        }
-    }
-
     fun saveVerseUsage(sermonId: String, title: String, verses: List<String>) {
         viewModelScope.launch {
             val list = verses.map {
@@ -887,13 +847,6 @@ class ShepherdViewModel(
         }
     }
 }
-
-data class DrawingStroke(
-    val points: List<androidx.compose.ui.geometry.Offset>,
-    val color: Int, // Hex ARGB
-    val strokeWidth: Float,
-    val isEraser: Boolean = false
-)
 
 data class ShepherdNotification(
     val id: String,

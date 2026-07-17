@@ -81,9 +81,11 @@ fun PushRevealDrawer(
     val menuItems = remember {
         listOf(
             DrawerMenuItem("home", "Home", Icons.Outlined.Home),
-            DrawerMenuItem("sermons", "Bible", Icons.Outlined.MenuBook),
+            DrawerMenuItem("sermons", "calender", Icons.Outlined.MenuBook),
             DrawerMenuItem("preach_mode", "Preach Mode", Icons.Outlined.PlayArrow),
             DrawerMenuItem("notes", "Notes", Icons.Outlined.Description),
+            DrawerMenuItem("sermon_ideas", "Sermon Ideas", Icons.Outlined.Lightbulb),
+            DrawerMenuItem("illustration_library", "Illustrations", Icons.Outlined.LibraryBooks),
             DrawerMenuItem("file_list", "Library", Icons.Outlined.FolderOpen),
             DrawerMenuItem("ai_editor", "AI Tools", Icons.Outlined.AutoAwesome),
             DrawerMenuItem("settings", "Settings", Icons.Outlined.Settings),
@@ -171,8 +173,8 @@ fun PushRevealDrawer(
                                 )
                                 .clickable {
                                     onClose()
-                                    val topLevelRoutes = listOf("home", "settings", "sermons", "preach_mode", "file_list", "ai_editor", "notes")
-                                    if (item.id in topLevelRoutes) {
+                                    val topLevelRoutes = listOf("home", "settings", "sermons", "preach_mode", "file_list", "ai_editor", "sermon_ideas")
+                                    if (item.id in topLevelRoutes || item.id.startsWith("notes") || item.id == "illustration_library") {
                                         onNavigate(item.id)
                                     } else {
                                         activeOverlayItem = item.id

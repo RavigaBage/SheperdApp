@@ -14,6 +14,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -146,29 +147,20 @@ fun SermonViewerScreen(
                 margin: 0;
                 padding: 24px 24px 120px 24px;
                 background-color: #FFFFFF;
-                color: #1A1A1A;
+                color: #000000;
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
                 transition: background-color 0.2s, color 0.2s;
                 user-select: text;
                 -webkit-user-select: text;
             }
 
-            body.night-mode {
-                background-color: #121212;
-                color: #E0E0E0;
-            }
-
             h1.chapter-title {
                 font-size: 20px;
                 font-weight: bold;
-                color: #0D1B2A;
+                color: #000000;
                 margin-top: 8px;
                 margin-bottom: 24px;
                 line-height: 1.3;
-            }
-
-            body.night-mode h1.chapter-title {
-                color: #FFFFFF;
             }
 
             p {
@@ -176,11 +168,7 @@ fun SermonViewerScreen(
                 line-height: 1.6;
                 margin-top: 0;
                 margin-bottom: 16px;
-                color: #1A1A1A;
-            }
-
-            body.night-mode p {
-                color: #E0E0E0;
+                color: #000000;
             }
 
             mark {
@@ -507,7 +495,7 @@ fun SermonViewerScreen(
                         fontFamily = FontFamily.Serif,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
-                        color = if (isNightMode) Color.White else Color(0xFF0D1B2A),
+                        color = Color.Black,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -517,7 +505,7 @@ fun SermonViewerScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = if (isNightMode) Color.White else Color(0xFF1A1A1A)
+                            tint = Color.Black
                         )
                     }
                 },
@@ -531,7 +519,7 @@ fun SermonViewerScreen(
                         Icon(
                             imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
                             contentDescription = "Bookmark",
-                            tint = if (isNightMode) Color.White else Color(0xFF1A1A1A)
+                            tint = Color.Black
                         )
                     }
 
@@ -540,7 +528,7 @@ fun SermonViewerScreen(
                         Icon(
                             imageVector = Icons.Default.MoreVert,
                             contentDescription = "More Options",
-                            tint = if (isNightMode) Color.White else Color(0xFF1A1A1A)
+                            tint = Color.Black
                         )
                     }
 
@@ -552,6 +540,7 @@ fun SermonViewerScreen(
                             text = { Text("Preach Mode Options") },
                             onClick = {
                                 showMenu = false
+                                viewModel.activeViewerIsNote = false
                                 showSetupSheet = true
                             },
                             leadingIcon = {
@@ -570,7 +559,7 @@ fun SermonViewerScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(if (isNightMode) Color(0xFF1E1E1E) else Color.White)
+                    .background(Color.White)
                     .padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())
             ) {
                 // Smooth Brightness slider panel when toggled
@@ -584,7 +573,7 @@ fun SermonViewerScreen(
                         Icon(
                             imageVector = Icons.Default.LightMode,
                             contentDescription = "Brightness",
-                            tint = if (isNightMode) Color.White else Color(0xFF0D1B2A),
+                            tint = Color.Black,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -606,11 +595,11 @@ fun SermonViewerScreen(
                         Text(
                             text = "${(brightness * 100).toInt()}%",
                             fontSize = 12.sp,
-                            color = if (isNightMode) Color.White else Color(0xFF0D1B2A),
+                            color = Color.Black,
                             fontWeight = FontWeight.Medium
                         )
                     }
-                    HorizontalDivider(color = if (isNightMode) Color.DarkGray else Color.LightGray)
+                    HorizontalDivider(color = Color.LightGray)
                 }
 
                 // Core control actions
@@ -635,7 +624,7 @@ fun SermonViewerScreen(
                         Icon(
                             imageVector = Icons.Default.Share,
                             contentDescription = "Share Sermon",
-                            tint = if (isNightMode) Color.White else Color(0xFF0D1B2A)
+                            tint = Color.Black
                         )
                     }
 
@@ -646,7 +635,7 @@ fun SermonViewerScreen(
                         Icon(
                             imageVector = if (showBrightnessSlider) Icons.Default.LightMode else Icons.Outlined.LightMode,
                             contentDescription = "Toggle Brightness Panel",
-                            tint = if (isNightMode) Color.White else Color(0xFF0D1B2A)
+                            tint = Color.Black
                         )
                     }
 
@@ -669,7 +658,7 @@ fun SermonViewerScreen(
                                 text = "A-",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (fontSizeSp > 12) (if (isNightMode) Color.White else Color(0xFF0D1B2A)) else Color.Gray
+                                color = Color.Black
                             )
                         }
                         
@@ -677,7 +666,7 @@ fun SermonViewerScreen(
                             text = "${fontSizeSp}px",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium,
-                            color = if (isNightMode) Color.White else Color(0xFF0D1B2A)
+                            color = Color.Black
                         )
 
                         IconButton(
@@ -694,27 +683,16 @@ fun SermonViewerScreen(
                                 text = "A+",
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (fontSizeSp < 32) (if (isNightMode) Color.White else Color(0xFF0D1B2A)) else Color.Gray
+                                color = Color.Black
                             )
                         }
                     }
 
-                    // Night-mode switch
-                    IconButton(onClick = {
-                        isNightMode = !isNightMode
-                        prefs.edit().putBoolean("night_mode", isNightMode).apply()
-                        webViewRef?.evaluateJavascript("setNightMode($isNightMode)", null)
-                    }) {
-                        Icon(
-                            imageVector = if (isNightMode) Icons.Default.DarkMode else Icons.Outlined.DarkMode,
-                            contentDescription = "Toggle Night Mode",
-                            tint = if (isNightMode) Color.White else Color(0xFF0D1B2A)
-                        )
-                    }
+                    // Night-mode switch removed
                 }
             }
         },
-        containerColor = if (isNightMode) Color(0xFF121212) else Color.White
+        containerColor = Color.White
     ) { paddingValues ->
         Box(
             modifier = Modifier
@@ -875,7 +853,6 @@ fun SermonViewerScreen(
                                         super.onPageFinished(view, url)
                                         // Sync settings immediately on load
                                         evaluateJavascript("setFontSize($fontSizeSp)", null)
-                                        evaluateJavascript("setNightMode($isNightMode)", null)
                                     }
                                 }
                                 addJavascriptInterface(
@@ -938,13 +915,14 @@ fun SermonViewerScreen(
                 ) {
                     Card(
                         colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFF0D1B2A), // Navy pill background
-                            contentColor = Color.White
+                            containerColor = Color.White, // Navy pill background
+                            contentColor = Color.Black
                         ),
                         shape = RoundedCornerShape(20.dp),
                         modifier = Modifier
                             .padding(bottom = 32.dp)
                             .shadow(elevation = 6.dp, shape = RoundedCornerShape(20.dp))
+                            .border(1.dp, Color.LightGray, RoundedCornerShape(20.dp))
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),

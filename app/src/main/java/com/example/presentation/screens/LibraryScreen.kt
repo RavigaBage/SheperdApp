@@ -57,6 +57,7 @@ fun LibraryScreen(
     var activeOptionsFile by remember { mutableStateOf<ShepherdFile?>(null) }
 
     Scaffold(
+        modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
                 title = {
@@ -92,7 +93,7 @@ fun LibraryScreen(
                 )
             }
         },
-        containerColor = Color(0xFFFAFAFA)
+        containerColor = Color.White
     ) { paddingValues ->
         val isSyncing by viewModel.isSyncing.collectAsState()
 

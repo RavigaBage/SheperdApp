@@ -253,7 +253,8 @@ data class SermonCalendarEntity(
     val scripturePulled: Boolean = false,
     val slidesBuilt: Boolean = false,
     val isRecurring: Boolean = false,
-    val travelMinutes: Int = 30
+    val travelMinutes: Int = 30,
+    val attachmentUrisJson: String? = null
 )
 
 @Entity(tableName = "preaching_log")

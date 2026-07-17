@@ -90,7 +90,8 @@ dependencies {
   implementation(libs.androidx.compose.ui)
   implementation(libs.androidx.compose.ui.graphics)
   implementation(libs.androidx.compose.ui.tooling.preview)
-  implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.compose.ui.unit)
+    implementation(libs.androidx.core.ktx)
   implementation(libs.androidx.documentfile)
   implementation(libs.androidx.datastore.preferences)
   implementation(libs.androidx.lifecycle.runtime.compose)
@@ -115,8 +116,21 @@ dependencies {
   implementation("org.apache.poi:poi-ooxml:5.2.5")
   implementation("com.tom-roush:pdfbox-android:2.0.27.0")
   implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.0")
+  implementation("com.google.mlkit:digital-ink-recognition:19.0.0")
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0")
   implementation("androidx.work:work-runtime-ktx:2.9.0")
-  
+
+  // Jetpack Ink for low-latency drawing
+  implementation("androidx.ink:ink-authoring:1.0.0")
+  implementation("androidx.ink:ink-authoring-compose:1.0.0")
+  implementation("androidx.ink:ink-brush:1.0.0")
+  implementation("androidx.ink:ink-brush-compose:1.0.0")
+  implementation("androidx.ink:ink-geometry:1.0.0")
+  implementation("androidx.ink:ink-geometry-compose:1.0.0")
+  implementation("androidx.ink:ink-nativeloader:1.0.0")
+  implementation("androidx.ink:ink-rendering:1.0.0")
+  implementation("androidx.ink:ink-strokes:1.0.0")
+
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)

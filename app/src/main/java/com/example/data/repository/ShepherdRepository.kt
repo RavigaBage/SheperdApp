@@ -9,7 +9,6 @@ import com.example.data.local.*
 import com.example.data.remote.FormatMode
 import com.example.data.remote.GeminiService
 import com.example.domain.model.*
-import com.example.presentation.viewmodel.DrawingStroke
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.withContext
@@ -57,6 +56,9 @@ class ShepherdRepository(
 
     fun getBibleVersion(): String = prefs.getString("bible_version", "NIV") ?: "NIV"
     fun setBibleVersion(ver: String) = prefs.edit().putString("bible_version", ver).apply()
+
+    fun getGeminiApiKey(): String = prefs.getString("gemini_api_key", "") ?: ""
+    fun setGeminiApiKey(key: String) = prefs.edit().putString("gemini_api_key", key).apply()
 
     // --- Flow Streams ---
     fun getAllFiles(): Flow<List<ShepherdFile>> {
@@ -199,12 +201,16 @@ class ShepherdRepository(
 
         val renamed = try {
             docFile?.renameTo(newName) ?: false
+        } catch (e: UnsupportedOperationException) {
+            false // provider doesn't support rename — handled by caller's message
         } catch (e: Exception) {
             e.printStackTrace()
             false
         }
 
         if (!renamed) return@withContext false
+        // ...unchanged
+
 
         // DocumentFile updates its own held Uri/name in place after a successful rename.
         val finalUri = docFile?.uri ?: fileUri
@@ -516,7 +522,7 @@ class ShepherdRepository(
 
     // --- AI Operations & DOCX ---
     fun formatTextStream(rawText: String, mode: FormatMode): Flow<String> {
-        return geminiService.formatDocumentStream(rawText, mode)
+        return geminiService.formatDocumentStream(rawText, mode, getGeminiApiKey())
     }
 
     suspend fun saveAiDocument(formattedText: String, title: String, mode: FormatMode, categoryId: String?) = withContext(Dispatchers.IO) {
@@ -573,122 +579,6 @@ class ShepherdRepository(
         }
     }
 
-    suspend fun savePastoralNote(
-        title: String,
-        text: String,
-        strokes: List<DrawingStroke>,
-        noteType: NoteType,
-        exportAsDocx: Boolean = false
-    ): String? = withContext(Dispatchers.IO) {
-        val rootUri = getRootFolderUri() ?: return@withContext null
-        val rootDir = DocumentFile.fromTreeUri(context, rootUri)
-            ?: return@withContext null
-
-        val typeTag = when (noteType) {
-            NoteType.TEXT -> "Typed"
-            NoteType.HANDWRITTEN -> "Handwritten"
-            NoteType.MIXED -> "Text+Handwritten"
-        }
-        val safeTitle = title.replace("/", "_").replace("\\", "_")
-
-        // 1. PDF save (unchanged generator, now tagged with note type in the filename)
-        val pdfGenerator = NotesGenerator(context)
-        val tempPdf = pdfGenerator.generateNotesPdf(title, text, strokes)
-        try {
-            val cleanPdfName = "$safeTitle [$typeTag].pdf"
-            val pdfDoc = rootDir.createFile("application/pdf", cleanPdfName)
-                ?: throw Exception("Failed to write PDF on filesystem")
-
-            context.contentResolver.openOutputStream(pdfDoc.uri).use { out ->
-                tempPdf.inputStream().use { input -> if (out != null) input.copyTo(out) }
-            }
-
-            dao.insertFile(
-                ShepherdFileEntity(
-                    id = pdfDoc.uri.toString(),
-                    name = cleanPdfName,
-                    extension = "pdf",
-                    uriString = pdfDoc.uri.toString(),
-                    categoryId = null,
-                    parentPath = "Root",
-                    sizeBytes = tempPdf.length(),
-                    lastModified = System.currentTimeMillis()
-                )
-            )
-
-            dao.insertHistory(HistoryEntity.fromDomain(
-                HistoryEntry(
-                    id = UUID.randomUUID().toString(),
-                    action = "Saved Pastoral Note '$cleanPdfName' ($typeTag)",
-                    fileName = cleanPdfName,
-                    fromPath = "Notes",
-                    toPath = "Root",
-                    timestamp = System.currentTimeMillis(),
-                    actionType = ActionType.CREATED
-                )
-            ))
-        } catch (e: Exception) {
-            e.printStackTrace()
-        } finally {
-            tempPdf.delete()
-        }
-
-        // 2. Optional .docx export — text content, embeds the drawing image when MIXED
-        var docxUriString: String? = null
-        if (exportAsDocx && text.isNotBlank()) {
-            val docxGenerator = DocxGenerator(context)
-            val tempDocx = docxGenerator.generateNotesDocx(
-                title = title,
-                text = text,
-                strokes = strokes,
-                includeDrawing = noteType == NoteType.MIXED
-            )
-            try {
-                val cleanDocxName = "$safeTitle [$typeTag].docx"
-                val docxDoc = rootDir.createFile(
-                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    cleanDocxName
-                ) ?: throw Exception("Failed to write DOCX on filesystem")
-
-                context.contentResolver.openOutputStream(docxDoc.uri).use { out ->
-                    tempDocx.inputStream().use { input -> if (out != null) input.copyTo(out) }
-                }
-
-                dao.insertFile(
-                    ShepherdFileEntity(
-                        id = docxDoc.uri.toString(),
-                        name = cleanDocxName,
-                        extension = "docx",
-                        uriString = docxDoc.uri.toString(),
-                        categoryId = null,
-                        parentPath = "Root",
-                        sizeBytes = tempDocx.length(),
-                        lastModified = System.currentTimeMillis()
-                    )
-                )
-
-                dao.insertHistory(HistoryEntity.fromDomain(
-                    HistoryEntry(
-                        id = UUID.randomUUID().toString(),
-                        action = "Exported Pastoral Note '$cleanDocxName' as Word doc",
-                        fileName = cleanDocxName,
-                        fromPath = "Notes",
-                        toPath = "Root",
-                        timestamp = System.currentTimeMillis(),
-                        actionType = ActionType.CREATED
-                    )
-                ))
-
-                docxUriString = docxDoc.uri.toString()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                tempDocx.delete()
-            }
-        }
-
-        docxUriString
-    }
     // --- Sermon & Series Operations ---
     suspend fun createSermon(title: String, scripture: String, seriesId: String?, datePreached: Long?, notes: String, fileId: String?) = withContext(Dispatchers.IO) {
         val sermon = Sermon(
@@ -841,11 +731,23 @@ class ShepherdRepository(
     }
 
     fun getUrielWordInsightStream(word: String, type: String, customPrompt: String = ""): Flow<String> =
-        geminiService.getUrielWordInsightStream(word, type, customPrompt)
+        geminiService.getUrielWordInsightStream(word, type, customPrompt, getGeminiApiKey())
 
     fun getUrielScriptureIntelligenceStream(scriptureRef: String, type: String): Flow<String> =
-        geminiService.getUrielScriptureIntelligenceStream(scriptureRef, type)
+        geminiService.getUrielScriptureIntelligenceStream(scriptureRef, type, getGeminiApiKey())
 
+    fun getTableStream(sourceText: String, instruction: String): Flow<String> {
+        val prompt = buildString {
+            appendLine("You are formatting content into a clean Markdown table based on a user's request.")
+            appendLine("User's request for the table: $instruction")
+            appendLine()
+            appendLine("Source text to use (if relevant):")
+            appendLine(sourceText.ifBlank { "(none provided — generate the table from the request alone)" })
+            appendLine()
+            appendLine("Return ONLY a valid Markdown table using | pipes and a header separator row (e.g. |---|---|). Do not include any explanation, preamble, or text before or after the table.")
+        }
+        return geminiService.formatDocumentStream(prompt, FormatMode.GENERAL, getGeminiApiKey())
+    }
     fun getUrielThemeDraftStream(topic: String): Flow<String> =
-        geminiService.getUrielThemeDraftStream(topic)
+        geminiService.getUrielThemeDraftStream(topic, getGeminiApiKey())
 }

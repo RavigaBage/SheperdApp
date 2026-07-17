@@ -12,16 +12,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = ShepherdGold,
-    onPrimary = Color.Black,
+    primary = ShepherdNavy,
+    onPrimary = Color.White,
     secondary = ShepherdGold,
     tertiary = ShepherdGold,
-    background = BackgroundDark,
-    surface = SurfaceDark,
-    onBackground = Color.White,
-    onSurface = Color.White,
-    onSurfaceVariant = Color.LightGray,
-    error = ErrorBurgundy
+    background = Color.White,
+    surface = Color.White,
+    onBackground = Color.Black,
+    onSurface = Color.Black,
+    onSurfaceVariant = Color.DarkGray,
+    error = ErrorBurgundy,
+    surfaceContainer = Color.White,
+    surfaceContainerLow = Color.White,
+    surfaceContainerLowest = Color.White,
+    surfaceContainerHigh = Color.White,
+    surfaceContainerHighest = Color.White,
+    surfaceVariant = Color.White,
+    outline = Color.DarkGray
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -29,12 +36,21 @@ private val LightColorScheme = lightColorScheme(
     onPrimary = Color.White,
     secondary = ShepherdGold,
     tertiary = ShepherdGold,
-    background = BackgroundCream,
-    surface = SurfaceCream,
-    onBackground = OnBackgroundSlate,
-    onSurface = OnSurfaceSlate,
-    error = ErrorBurgundy
+    background = Color.White,
+    surface = Color.White,
+    onBackground = Color.Black,
+    onSurface = Color.Black,
+    onSurfaceVariant = Color.DarkGray,
+    error = ErrorBurgundy,
+    surfaceContainer = Color.White,
+    surfaceContainerLow = Color.White,
+    surfaceContainerLowest = Color.White,
+    surfaceContainerHigh = Color.White,
+    surfaceContainerHighest = Color.White,
+    surfaceVariant = Color.White,
+    outline = Color.DarkGray
 )
+
 
 @Composable
 fun MyApplicationTheme(

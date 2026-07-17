@@ -86,7 +86,7 @@ fun HomeScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF1B2B4B))
+                    .background(Color.White)
                     .statusBarsPadding()
             ) {
                 Row(
@@ -105,12 +105,12 @@ fun HomeScreen(
                             Icon(
                                 imageVector = Icons.Default.Menu,
                                 contentDescription = "Open Drawer",
-                                tint = Color.White
+                                tint = Color.Black
                             )
                         }
                         Text(
                             text = "Shepherd",
-                            color = Color.White,
+                            color = Color.Black,
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Medium,
                             fontFamily = FontFamily.Serif
@@ -122,7 +122,7 @@ fun HomeScreen(
                         Icon(
                             imageVector = Icons.Default.Search,
                             contentDescription = "Search",
-                            tint = Color.White
+                            tint = Color.Black
                         )
                     }
                 }
@@ -131,7 +131,7 @@ fun HomeScreen(
         bottomBar = {
             // Bottom navigation removed as per request
         },
-        containerColor = Color(0xFFFAF9F6) // Soft Light Page Background
+        containerColor = Color.White // Soft Light Page Background
     ) { paddingValues ->
         if (rootFolder == null) {
             // Connect directory onboarding CTA
@@ -585,7 +585,19 @@ fun HomeScreen(
                                 }
 
                                 // Overlapping FAB anchored to bottom-right corner of categories section
-
+                                FloatingActionButton(
+                                    onClick = { showCreateCategorySheet = true },
+                                    modifier = Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .padding(bottom = 4.dp, end = 4.dp)
+                                        .size(32.dp),
+                                    containerColor = Color(0xFF1B2B4B),
+                                    contentColor = Color.White,
+                                    shape = CircleShape,
+                                    elevation = FloatingActionButtonDefaults.elevation(0.dp)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = "Add category", modifier = Modifier.size(16.dp))
+                                }
                             }
                         }
                     }
@@ -663,8 +675,15 @@ fun HomeScreen(
     }
 
     // Modal sheet overrides for Dynamic category setup
-
-
+    if (showCreateCategorySheet) {
+        CreateCategoryBottomSheet(
+            onDismiss = { showCreateCategorySheet = false },
+            onCreate = { name, emoji, colorHex ->
+                viewModel.createCategory(name, colorHex, emoji)
+                showCreateCategorySheet = false
+            }
+        )
+    }
 }
 
 // Bottom sheet modal for creating category presets

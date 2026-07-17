@@ -18,13 +18,27 @@ import androidx.room.RoomDatabase
         PreachingLogEntity::class,
         VerseUsageEntity::class,
         PreachCacheEntity::class,
-        BibleCacheEntity::class
+        BibleCacheEntity::class,
+        com.example.notes.data.NotebookEntity::class,
+        com.example.notes.data.PageEntity::class,
+        com.example.notes.data.PageElementEntity::class,
+        com.example.notes.data.IllustrationEntity::class,
+        com.example.notes.data.SermonTemplateEntity::class
     ],
-    version = 5,
+    version = 14,
     exportSchema = false
+)
+@androidx.room.TypeConverters(
+    com.example.notes.data.ElementTypeConverter::class,
+    com.example.notes.data.PageBackgroundStyleConverter::class
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): AppDatabaseDao
+    abstract fun notebookDao(): com.example.notes.data.NotebookDao
+    abstract fun pageDao(): com.example.notes.data.PageDao
+    abstract fun pageElementDao(): com.example.notes.data.PageElementDao
+    abstract fun illustrationDao(): com.example.notes.data.IllustrationDao
+    abstract fun sermonTemplateDao(): com.example.notes.data.SermonTemplateDao
 
     companion object {
         @Volatile
@@ -36,8 +50,12 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "shepherd_db"
-                ).fallbackToDestructiveMigration()
-                 .build()
+                )
+                // TODO: Before production release, replace with a proper Migration
+                // if there is real user data to preserve. For now, during rebuild,
+                // destructive migration is fine.
+                .fallbackToDestructiveMigration()
+                .build()
                 INSTANCE = instance
                 instance
             }

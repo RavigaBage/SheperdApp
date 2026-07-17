@@ -35,15 +35,15 @@ fun SearchScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Spotlight Search", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold) },
+                title = { Text("Spotlight Search", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, color = Color.Black) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.Black)
                     }
                 }
             )
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = Color.White
     ) { paddingValues ->
         Column(
             modifier = Modifier

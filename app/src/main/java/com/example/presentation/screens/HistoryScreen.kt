@@ -39,6 +39,7 @@ fun HistoryScreen(
     val history by viewModel.history.collectAsState()
 
     Scaffold(
+        modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
                 title = { Text("Activity History", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold) },
@@ -50,7 +51,7 @@ fun HistoryScreen(
             )
         },
         bottomBar = { },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = Color.White
     ) { paddingValues ->
         if (history.isEmpty()) {
             Box(

@@ -38,9 +38,13 @@ fun SettingsScreen(
     val pastorName by viewModel.pastorName.collectAsState()
     val bibleVersion by viewModel.bibleVer.collectAsState()
     val themeMode by viewModel.themeMode.collectAsState()
+    val geminiApiKey by viewModel.geminiApiKey.collectAsState()
 
     var pastorNameInput by remember { mutableStateOf(pastorName) }
     var showPastorNameDialog by remember { mutableStateOf(false) }
+
+    var geminiApiKeyInput by remember { mutableStateOf(geminiApiKey) }
+    var showGeminiApiKeyDialog by remember { mutableStateOf(false) }
 
     val folderPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
@@ -53,15 +57,15 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("App Preferences", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold) },
+                title = { Text("App Preferences", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, color = Color.Black) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.Black)
                     }
                 }
             )
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = Color.White
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -117,6 +121,27 @@ fun SettingsScreen(
                 }
             }
 
+            // AI Study Configuration
+            Text("AI Study Configuration", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column {
+                    SettingsRow(
+                        icon = Icons.Default.VpnKey,
+                        title = "Gemini API Key",
+                        subtitle = if (geminiApiKey.isEmpty()) "Not set" else "••••••••${geminiApiKey.takeLast(4)}",
+                        onClick = { 
+                            geminiApiKeyInput = geminiApiKey
+                            showGeminiApiKeyDialog = true 
+                        }
+                    )
+                }
+            }
+
             // Action triggers
             Text("Auditing Utilities", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
 
@@ -136,7 +161,6 @@ fun SettingsScreen(
                                 FileOutputStream(downloadsDir).use { out ->
                                     val header = "ID,Sermon,Scripture,Personal Notes\n"
                                     out.write(header.toByteArray())
-                                    // Simulated list write
                                     viewModel.sermons.value.forEach { s ->
                                         out.write("${s.id},\"${s.title}\",\"${s.scriptureRef}\",\"${s.notes}\"\n".toByteArray())
                                     }
@@ -180,6 +204,42 @@ fun SettingsScreen(
         )
     }
 
+    if (showGeminiApiKeyDialog) {
+        AlertDialog(
+            onDismissRequest = { showGeminiApiKeyDialog = false },
+            title = { Text("Gemini AI API Key", fontFamily = FontFamily.Serif) },
+            text = {
+                Column {
+                    Text(
+                        "Enter your Google Gemini API Key. You can get one for free from Google AI Studio.",
+                        fontSize = 12.sp,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    OutlinedTextField(
+                        value = geminiApiKeyInput,
+                        onValueChange = { geminiApiKeyInput = it },
+                        label = { Text("API Key") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    viewModel.updateGeminiApiKey(geminiApiKeyInput)
+                    showGeminiApiKeyDialog = false
+                    Toast.makeText(context, "API Key updated successfully.", Toast.LENGTH_SHORT).show()
+                }) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showGeminiApiKeyDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @Composable

@@ -25,10 +25,14 @@ import com.example.domain.model.Sermon
 import com.example.presentation.components.bounceClickable
 import com.example.presentation.components.MinistryBottomBar
 import com.example.presentation.viewmodel.ShepherdViewModel
+import androidx.activity.compose.BackHandler
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
 import java.text.SimpleDateFormat
 import java.util.*
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SermonOrganizerScreen(
     viewModel: ShepherdViewModel,
@@ -45,15 +49,15 @@ fun SermonOrganizerScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Missions & Sermons", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold) },
+                title = { Text("Missions & Sermons", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, color = Color.Black) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.Black)
                     }
                 },
                 actions = {
                     IconButton(onClick = onNavigateToCalendar) {
-                        Icon(Icons.Default.CalendarMonth, contentDescription = "Preaching Calendar")
+                        Icon(Icons.Default.CalendarMonth, contentDescription = "Preaching Calendar", tint = Color.Black)
                     }
                 }
             )
@@ -79,7 +83,7 @@ fun SermonOrganizerScreen(
                 }
             }
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = Color.White
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
@@ -285,7 +289,7 @@ fun SeriesDisplayCard(series: Series) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun CreateSermonWizardDialog(
     seriesOptions: List<Series>,
@@ -296,6 +300,12 @@ fun CreateSermonWizardDialog(
     var scripture by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
     var selectedSeriesId by remember { mutableStateOf<String?>(null) }
+
+    val isImeVisible = WindowInsets.isImeVisible
+    val keyboardController = LocalSoftwareKeyboardController.current
+    BackHandler(enabled = isImeVisible) {
+        keyboardController?.hide()
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -358,6 +368,7 @@ fun CreateSermonWizardDialog(
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CreateSeriesDialog(
     onDismiss: () -> Unit,
@@ -365,6 +376,12 @@ fun CreateSeriesDialog(
 ) {
     var name by remember { mutableStateOf("") }
     var desc by remember { mutableStateOf("") }
+
+    val isImeVisible = WindowInsets.isImeVisible
+    val keyboardController = LocalSoftwareKeyboardController.current
+    BackHandler(enabled = isImeVisible) {
+        keyboardController?.hide()
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,

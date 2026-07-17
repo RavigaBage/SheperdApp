@@ -42,6 +42,10 @@ import java.util.*
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.style.TextAlign
+import androidx.activity.compose.BackHandler
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,13 +80,15 @@ fun FileListScreen(
     }
 
     Scaffold(
+        modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
                 title = {
                     Text(
                         if (isMultiSelectActive) "${selectedFileIds.size} Selected" else "Study Library",
                         fontFamily = FontFamily.Serif,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
                     )
                 },
                 navigationIcon = {
@@ -95,7 +101,8 @@ fun FileListScreen(
                     }) {
                         Icon(
                             imageVector = if (isMultiSelectActive) Icons.Default.Close else Icons.Default.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = "Back",
+                            tint = Color.Black
                         )
                     }
                 },
@@ -109,11 +116,11 @@ fun FileListScreen(
                                     }
                                 }
                             ) {
-                                Icon(Icons.Default.DeleteOutline, contentDescription = "Trash")
+                                Icon(Icons.Default.DeleteOutline, contentDescription = "Trash", tint = Color.Black)
                             }
                         }
                         IconButton(onClick = { viewModel.syncFiles() }) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Sync Files")
+                            Icon(Icons.Default.Refresh, contentDescription = "Sync Files", tint = Color.Black)
                         }
                     }
                 }
@@ -131,7 +138,7 @@ fun FileListScreen(
                         modifier = Modifier.fillMaxWidth(),
                         tonalElevation = 8.dp,
                         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer
+                        color = Color.White
                     ) {
                         Row(
                             modifier = Modifier
@@ -145,7 +152,8 @@ fun FileListScreen(
                             Button(
                                 onClick = { showMoveCategoryDialog = true },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary
+                                    containerColor = Color.Black,
+                                    contentColor = Color.White
                                 ),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
@@ -158,7 +166,8 @@ fun FileListScreen(
                             Button(
                                 onClick = { viewModel.deleteSelectedFiles() },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.error
+                                    containerColor = Color.Red,
+                                    contentColor = Color.White
                                 ),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
@@ -173,7 +182,44 @@ fun FileListScreen(
                 // Bottom bar removed
             }
         },
-        containerColor = MaterialTheme.colorScheme.background
+        floatingActionButton = {
+            Box {
+                FloatingActionButton(
+                    onClick = { showFabMenu = true },
+                    containerColor = Color(0xFF1B2B4B),
+                    contentColor = Color.White,
+                    shape = CircleShape
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = "Create new",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                DropdownMenu(
+                    expanded = showFabMenu,
+                    onDismissRequest = { showFabMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("New Folder") },
+                        leadingIcon = { Icon(Icons.Default.CreateNewFolder, contentDescription = null) },
+                        onClick = {
+                            showFabMenu = false
+                            showCreateCategorySheet = true
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("New File") },
+                        leadingIcon = { Icon(Icons.Default.NoteAdd, contentDescription = null) },
+                        onClick = {
+                            showFabMenu = false
+                            showCreateFileSheet = true
+                        }
+                    )
+                }
+            }
+        },
+        containerColor = Color.White
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -338,46 +384,7 @@ fun FileListScreen(
         }
     }
 
-    // FAB — tap opens a small menu: New Folder (existing Category flow) / New File
-    Box {
-        FloatingActionButton(
-            onClick = { showFabMenu = true },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .offset(x = 4.dp, y = 4.dp)
-                .size(56.dp),
-            containerColor = Color(0xFF1B2B4B),
-            contentColor = Color.White,
-            shape = CircleShape
-        ) {
-            Icon(
-                Icons.Default.Add,
-                contentDescription = "Create new",
-                modifier = Modifier.size(24.dp)
-            )
-        }
-        DropdownMenu(
-            expanded = showFabMenu,
-            onDismissRequest = { showFabMenu = false }
-        ) {
-            DropdownMenuItem(
-                text = { Text("New Folder") },
-                leadingIcon = { Icon(Icons.Default.CreateNewFolder, contentDescription = null) },
-                onClick = {
-                    showFabMenu = false
-                    showCreateCategorySheet = true
-                }
-            )
-            DropdownMenuItem(
-                text = { Text("New File") },
-                leadingIcon = { Icon(Icons.Default.NoteAdd, contentDescription = null) },
-                onClick = {
-                    showFabMenu = false
-                    showCreateFileSheet = true
-                }
-            )
-        }
-    }
+
 
     if (showCreateCategorySheet) {
         CreateCategoryBottomSheet(
@@ -446,14 +453,14 @@ fun FileListScreen(
                         fileToRename = null
                         renameError = null
                     } else {
-                        renameError = "Couldn't rename this file. It may not support renaming, or the name is already taken."
+                        renameError = "This file's storage location doesn't support renaming. Try moving it to a different folder first."
                     }
                 }
             }
         )
     }
 }
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun CreateCategoryBottomSheet(
     onDismiss: () -> Unit,
@@ -465,6 +472,14 @@ fun CreateCategoryBottomSheet(
 
     val emojis = listOf("📖", "✉️", "📊", "⛪", "✝️", "📚", "🕊️", "🏡")
     val colors = listOf("#1B2B4B", "#C9A84C", "#2D6A4F", "#C0392B", "#6C5CE7", "#00CEC9", "#E17055", "#636E72")
+
+    val isImeVisible = WindowInsets.isImeVisible
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    // Intercept back press when keyboard is visible to hide keyboard first
+    BackHandler(enabled = isImeVisible) {
+        keyboardController?.hide()
+    }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -593,7 +608,7 @@ private fun RenameFileDialog(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun CreateFileBottomSheet(
     categories: List<Category>,
@@ -604,6 +619,12 @@ private fun CreateFileBottomSheet(
     var selectedExtension by remember { mutableStateOf("txt") }
     var selectedCategoryId by remember { mutableStateOf<String?>(null) }
     val extensions = listOf("txt", "docx")
+    val isImeVisible = WindowInsets.isImeVisible
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    BackHandler(enabled = isImeVisible) {
+        keyboardController?.hide()
+    }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(

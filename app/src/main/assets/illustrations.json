@@ -1,0 +1,177 @@
+{
+  "version": 3,
+  "categories": [
+    { "id": "cat_faith", "name": "Faith & Trust", "colorHex": "#2D6A4F", "iconEmoji": "🛡️" },
+    { "id": "cat_grace", "name": "Grace & Mercy", "colorHex": "#C9A84C", "iconEmoji": "🕊️" },
+    { "id": "cat_prayer", "name": "Prayer & Intimacy", "colorHex": "#1B2B4B", "iconEmoji": "🙏" },
+    { "id": "cat_identity", "name": "Identity in Christ", "colorHex": "#E07A5F", "iconEmoji": "🆔" },
+    { "id": "cat_spiritual_growth", "name": "Spiritual Growth", "colorHex": "#81B29A", "iconEmoji": "🌱" },
+    { "id": "cat_holy_spirit", "name": "Holy Spirit", "colorHex": "#F2CC8F", "iconEmoji": "🔥" },
+    { "id": "cat_victory", "name": "Victory & Overcoming", "colorHex": "#3D405B", "iconEmoji": "🏆" },
+    { "id": "cat_worship", "name": "Worship & Surrender", "colorHex": "#F4F1DE", "iconEmoji": "🙌" },
+    { "id": "cat_purpose", "name": "Kingdom Purpose", "colorHex": "#C9A84C", "iconEmoji": "👑" },
+    { "id": "cat_love", "name": "Love & Compassion", "colorHex": "#E07A5F", "iconEmoji": "❤️" }
+  ],
+  "items": [
+    {
+      "id": "theme_1",
+      "title": "Faith That Moves Mountains",
+      "bodyText": "A sermon theme about trusting God's power beyond human limitations and believing Him for impossible situations.",
+      "categoryId": "cat_faith",
+      "scriptureReference": "Matthew 17:20",
+      "imageUrl": "file:///android_asset/illustrations/themes/theme_1.jpg"
+    },
+    {
+      "id": "theme_2",
+      "title": "Walking by Faith, Not by Sight",
+      "bodyText": "A sermon theme exploring how believers follow God's promises even when circumstances appear uncertain.",
+      "categoryId": "cat_faith",
+      "scriptureReference": "2 Corinthians 5:7",
+      "imageUrl": "file:///android_asset/illustrations/themes/theme_2.jpg"
+    },
+    {
+      "id": "theme_3",
+      "title": "Saved by Grace, Sustained by Grace",
+      "bodyText": "A sermon theme showing that God's grace is not only the beginning of salvation but the strength for daily living.",
+      "categoryId": "cat_grace",
+      "scriptureReference": "Ephesians 2:8-9",
+      "imageUrl": "file:///android_asset/illustrations/themes/theme_3.jpg"
+    },
+    {
+      "id": "theme_4",
+      "title": "Mercy That Gives Another Chance",
+      "bodyText": "A sermon theme about God's compassion, forgiveness, and restoration after failure.",
+      "categoryId": "cat_grace",
+      "scriptureReference": "Lamentations 3:22-23",
+      "imageUrl": "file:///android_asset/illustrations/themes/theme_4.jpg"
+    },
+    {
+      "id": "theme_5",
+      "title": "The Secret Place of Power",
+      "bodyText": "A sermon theme about discovering strength, intimacy, and direction through consistent prayer.",
+      "categoryId": "cat_prayer",
+      "scriptureReference": "Matthew 6:6",
+      "imageUrl": "file:///android_asset/illustrations/themes/theme_5.jpg"
+    },
+    {
+      "id": "theme_6",
+      "title": "When Heaven Responds to Persistent Prayer",
+      "bodyText": "A sermon theme teaching perseverance and faithfulness in prayer until God's purpose is revealed.",
+      "categoryId": "cat_prayer",
+      "scriptureReference": "Luke 18:1",
+      "imageUrl": "file:///android_asset/illustrations/themes/theme_6.jpg"
+    },
+    {
+      "id": "theme_7",
+      "title": "A New Creation in Christ",
+      "bodyText": "A sermon theme about leaving the old identity behind and embracing who God has made believers to become.",
+      "categoryId": "cat_identity",
+      "scriptureReference": "2 Corinthians 5:17",
+      "imageUrl": "file:///android_asset/illustrations/themes/theme_7.jpg"
+    },
+    {
+      "id": "theme_8",
+      "title": "Chosen, Called, and Accepted",
+      "bodyText": "A sermon theme about discovering spiritual identity through God's love and purpose.",
+      "categoryId": "cat_identity",
+      "scriptureReference": "1 Peter 2:9",
+      "imageUrl": "file:///android_asset/illustrations/themes/theme_8.jpg"
+    },
+    {
+      "id": "theme_9",
+      "title": "Growing Deep Roots in God",
+      "bodyText": "A sermon theme about developing spiritual maturity through the Word, prayer, and obedience.",
+      "categoryId": "cat_spiritual_growth",
+      "scriptureReference": "Colossians 2:6-7",
+      "imageUrl": "file:///android_asset/illustrations/themes/theme_9.jpg"
+    },
+    {
+      "id": "theme_10",
+      "title": "From Milk to Maturity",
+      "bodyText": "A sermon theme about moving from spiritual infancy into deeper understanding and responsibility.",
+      "categoryId": "cat_spiritual_growth",
+      "scriptureReference": "Hebrews 5:12-14",
+      "imageUrl": "file:///android_asset/illustrations/themes/theme_10.jpg"
+    },
+    {
+      "id": "theme_11",
+      "title": "The Fire Within",
+      "bodyText": "A sermon theme about the Holy Spirit's presence empowering believers for transformation and service.",
+      "categoryId": "cat_holy_spirit",
+      "scriptureReference": "Acts 1:8",
+      "imageUrl": "file:///android_asset/illustrations/themes/theme_11.jpg"
+    },
+    {
+      "id": "theme_12",
+      "title": "Walking in the Spirit",
+      "bodyText": "A sermon theme about living daily under the guidance and influence of the Holy Spirit.",
+      "categoryId": "cat_holy_spirit",
+      "scriptureReference": "Galatians 5:16",
+      "imageUrl": "file:///android_asset/illustrations/themes/theme_12.jpg"
+    },
+    {
+      "id": "theme_13",
+      "title": "Victory Is Already Won",
+      "bodyText": "A sermon theme reminding believers that Christ has already defeated sin, death, and spiritual opposition.",
+      "categoryId": "cat_victory",
+      "scriptureReference": "1 Corinthians 15:57",
+      "imageUrl": "file:///android_asset/illustrations/themes/theme_13.jpg"
+    },
+    {
+      "id": "theme_14",
+      "title": "Overcoming Through Christ",
+      "bodyText": "A sermon theme about developing spiritual courage through God's strength during battles.",
+      "categoryId": "cat_victory",
+      "scriptureReference": "Romans 8:37",
+      "imageUrl": "file:///android_asset/illustrations/themes/theme_14.jpg"
+    },
+    {
+      "id": "theme_15",
+      "title": "A Heart That Worships",
+      "bodyText": "A sermon theme about worship being a lifestyle of surrender, not only a moment of singing.",
+      "categoryId": "cat_worship",
+      "scriptureReference": "Romans 12:1",
+      "imageUrl": "file:///android_asset/illustrations/themes/theme_15.jpg"
+    },
+    {
+      "id": "theme_16",
+      "title": "The Altar of Surrender",
+      "bodyText": "A sermon theme about giving God control over every area of life.",
+      "categoryId": "cat_worship",
+      "scriptureReference": "Luke 9:23",
+      "imageUrl": "file:///android_asset/illustrations/themes/theme_16.jpg"
+    },
+    {
+      "id": "theme_17",
+      "title": "Created for Kingdom Purpose",
+      "bodyText": "A sermon theme about discovering God's assignment and living intentionally.",
+      "categoryId": "cat_purpose",
+      "scriptureReference": "Ephesians 2:10",
+      "imageUrl": "file:///android_asset/illustrations/themes/theme_17.jpg"
+    },
+    {
+      "id": "theme_18",
+      "title": "Called Beyond Comfort",
+      "bodyText": "A sermon theme about responding to God's call even when it requires sacrifice and courage.",
+      "categoryId": "cat_purpose",
+      "scriptureReference": "Isaiah 6:8",
+      "imageUrl": "file:///android_asset/illustrations/themes/theme_18.jpg"
+    },
+    {
+      "id": "theme_19",
+      "title": "The Love That Never Fails",
+      "bodyText": "A sermon theme revealing God's unconditional and everlasting love toward humanity.",
+      "categoryId": "cat_love",
+      "scriptureReference": "Romans 8:38-39",
+      "imageUrl": "file:///android_asset/illustrations/themes/theme_19.jpg"
+    },
+    {
+      "id": "theme_20",
+      "title": "Loved to Love Others",
+      "bodyText": "A sermon theme about receiving God's love and becoming a channel of His love to others.",
+      "categoryId": "cat_love",
+      "scriptureReference": "1 John 4:19",
+      "imageUrl": "file:///android_asset/illustrations/themes/theme_20.jpg"
+    }
+  ]
+}

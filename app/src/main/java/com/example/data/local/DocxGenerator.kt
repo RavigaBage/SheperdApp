@@ -1,9 +1,5 @@
 package com.example.data.local
-import android.graphics.Bitmap
-import com.example.presentation.viewmodel.DrawingStroke
-import org.apache.poi.util.Units
 import org.apache.poi.xwpf.usermodel.Document
-import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import android.content.Context
 import com.example.data.remote.FormatMode
@@ -138,90 +134,6 @@ class DocxGenerator(private val context: Context) {
     }
 
 
-
-        /**
-         * Builds a .docx for a Pastoral Note: title, plain-text body (one paragraph
-         * per line — no markdown parsing, since notes are free-form rather than
-         * AI-formatted), and an optional embedded image of the handwriting when
-         * includeDrawing is true (used for MIXED notes).
-         */
-        fun generateNotesDocx(
-            title: String,
-            text: String,
-            strokes: List<DrawingStroke> = emptyList(),
-            includeDrawing: Boolean = false
-        ): File {
-            val tempFile = File(context.cacheDir, "pastoral_note_${UUID.randomUUID()}.docx")
-            try {
-                XWPFDocument().use { document ->
-                    val titleParagraph = document.createParagraph().apply {
-                        alignment = ParagraphAlignment.CENTER
-                        spacingAfter = 300
-                    }
-                    titleParagraph.createRun().apply {
-                        isBold = true
-                        fontSize = 22
-                        fontFamily = "Georgia"
-                        setText(title)
-                    }
-
-                    if (text.isNotBlank()) {
-                        for (line in text.lines()) {
-                            val paragraph = document.createParagraph().apply {
-                                alignment = ParagraphAlignment.LEFT
-                                spacingAfter = 100
-                            }
-                            paragraph.createRun().apply {
-                                fontSize = 11
-                                fontFamily = "Arial"
-                                setText(line)
-                            }
-                        }
-                    }
-
-                    if (includeDrawing && strokes.isNotEmpty()) {
-                        val bitmap = StrokeBitmapRenderer.render(strokes)
-                        val imageBytes = ByteArrayOutputStream().use { bos ->
-                            bitmap.compress(Bitmap.CompressFormat.PNG, 100, bos)
-                            bos.toByteArray()
-                        }
-
-                        // Cap width at ~6in (576px @ 96dpi) so it fits the page margins;
-                        // scale height proportionally to preserve aspect ratio.
-                        val maxWidthPx = 576
-                        val scale = if (bitmap.width > maxWidthPx) maxWidthPx.toDouble() / bitmap.width else 1.0
-                        val displayWidthPx = (bitmap.width * scale).toInt()
-                        val displayHeightPx = (bitmap.height * scale).toInt()
-
-                        val imgParagraph = document.createParagraph().apply {
-                            alignment = ParagraphAlignment.CENTER
-                            spacingBefore = 300
-                        }
-                        ByteArrayInputStream(imageBytes).use { imgStream ->
-                            imgParagraph.createRun().addPicture(
-                                imgStream,
-                                Document.PICTURE_TYPE_PNG,
-                                "handwriting.png",
-                                Units.pixelToEMU(displayWidthPx),
-                                Units.pixelToEMU(displayHeightPx)
-                            )
-                        }
-                    }
-
-                    FileOutputStream(tempFile).use { out -> document.write(out) }
-                }
-            } catch (e: Throwable) {
-                // Same crash-resilience pattern as generateDocx: fall back to plain text
-                // rather than leaving a corrupt/empty .docx if POI throws.
-                e.printStackTrace()
-                try {
-                    tempFile.writeText("=== TITLE: $title ===\n\n$text")
-                } catch (e2: Exception) {
-                    e2.printStackTrace()
-                }
-            }
-            return tempFile
-        }
 
     private fun cleanMarkdown(text: String): String {
         return text.replace("**", "").replace("*", "").replace("`", "")
