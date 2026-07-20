@@ -189,11 +189,8 @@ Your API key should never be committed to source control.
 
 ---
 
-## 📄 License
+<img width="576" height="1280" alt="photo_2026-07-20_09-30-23" src="https://github.com/user-attachments/assets/2d4a9853-a4df-44c5-9a2d-1ca191271bbc" />
 
-This project is licensed under the MIT License. See the `LICENSE` file for details.
-
----
 
 <div align="center">
 
