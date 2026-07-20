@@ -8,8 +8,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
@@ -36,7 +38,6 @@ fun NotesScreen(
     pageId: String,
     onBack: () -> Unit,
     notebookId: String,
-    onNavigateToPreach: (Int) -> Unit,
     onNavigateToLibrary: () -> Unit,
     pendingInsertText: String? = null,
     onClearPendingInsertText: () -> Unit = {}
@@ -59,6 +60,13 @@ fun NotesScreen(
     val backgroundStyle by viewModel.backgroundStyle.collectAsState()
     val backgroundColorHex by viewModel.backgroundColor.collectAsState()
     val backgroundColor = remember(backgroundColorHex) { Color(backgroundColorHex.toColorInt()) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        viewModel.exportStatus.collect { message ->
+            snackbarHostState.showSnackbar(message)
+        }
+    }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -82,6 +90,8 @@ fun NotesScreen(
     }
 
     Scaffold(
+        modifier = Modifier.imePadding(),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Notebook Canvas") },
@@ -94,16 +104,8 @@ fun NotesScreen(
                     IconButton(onClick = { viewModel.savePage() }) {
                         Icon(Icons.Default.Save, contentDescription = "Save")
                     }
-                    IconButton(onClick = { 
-                        // Placeholder for PDF Export
-                    }) {
-                        Icon(Icons.Default.PictureAsPdf, contentDescription = "Export PDF")
-                    }
                     IconButton(onClick = onNavigateToLibrary) {
                         Icon(Icons.AutoMirrored.Filled.LibraryBooks, contentDescription = "Library")
-                    }
-                    IconButton(onClick = { onNavigateToPreach(30) }) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = "Preach")
                     }
                 }
             )
@@ -178,23 +180,23 @@ fun NotesScreen(
             }
         }
     ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize().padding(paddingValues).background(backgroundColor)) {
+        val scrollState = rememberScrollState()
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .background(backgroundColor)
+                .verticalScroll(scrollState)
+        ) {
             InkCanvas(
                 objects = canvasObjects,
-                onStrokeFinished = { points, color, size ->
-                    val nextZ = (canvasObjects.maxOfOrNull { it.zIndex } ?: -1) + 1
-                    viewModel.addCanvasObject(CanvasObject.StrokeObject(
-                        id = UUID.randomUUID().toString(),
-                        zIndex = nextZ,
-                        points = points,
-                        colorHex = color,
-                        brushWidth = size
-                    ))
+                onStrokeFinished = { id, points, color, size ->
+                    viewModel.addStroke(id, points, color, size)
                 },
                 onObjectRemoved = { viewModel.removeCanvasObject(it) },
                 onObjectUpdated = { viewModel.updateCanvasObject(it) },
-                onEmptySpaceTapped = { x, y ->
-                    viewModel.insertTextAt(x, y)
+                onEmptySpaceTapped = { x, y, canvasWidthPx ->
+                    viewModel.insertTextAt(x, y, canvasWidthPx)
                 },
                 brushColor = canvasState.brushColor,
                 brushSize = canvasState.brushSize,
@@ -205,7 +207,9 @@ fun NotesScreen(
                 onFocusedTextChange = { viewModel.setFocusedText(it) },
                 selectedObjectId = canvasState.selectedObjectId,
                 onSelectedObjectChange = { viewModel.setSelectedObject(it) },
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1200.dp) // Provide enough height for scrolling
             )
         }
     }

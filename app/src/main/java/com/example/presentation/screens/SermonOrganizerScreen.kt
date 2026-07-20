@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.sp
 import com.example.domain.model.Series
 import com.example.domain.model.Sermon
 import com.example.presentation.components.bounceClickable
-import com.example.presentation.components.MinistryBottomBar
+import com.example.presentation.components.keyboardAware
 import com.example.presentation.viewmodel.ShepherdViewModel
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -319,21 +319,21 @@ fun CreateSermonWizardDialog(
                     value = title,
                     onValueChange = { title = it },
                     label = { Text("Sermon Title") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().keyboardAware()
                 )
 
                 OutlinedTextField(
                     value = scripture,
                     onValueChange = { scripture = it },
                     label = { Text("Scripture Verse Reference") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().keyboardAware()
                 )
 
                 OutlinedTextField(
                     value = notes,
                     onValueChange = { notes = it },
                     label = { Text("Personal details details") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().keyboardAware()
                 )
 
                 if (seriesOptions.isNotEmpty()) {
@@ -394,13 +394,13 @@ fun CreateSeriesDialog(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Series Name") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().keyboardAware()
                 )
                 OutlinedTextField(
                     value = desc,
                     onValueChange = { desc = it },
                     label = { Text("Brief description") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().keyboardAware()
                 )
             }
         },

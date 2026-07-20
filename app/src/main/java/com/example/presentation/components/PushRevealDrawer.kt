@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.domain.model.ShepherdFile
+import com.example.presentation.components.keyboardAware
 import com.example.presentation.viewmodel.ShepherdViewModel
 import com.example.ui.theme.ShepherdGold
 import kotlinx.coroutines.delay
@@ -81,13 +82,13 @@ fun PushRevealDrawer(
     val menuItems = remember {
         listOf(
             DrawerMenuItem("home", "Home", Icons.Outlined.Home),
-            DrawerMenuItem("sermons", "calender", Icons.Outlined.MenuBook),
-            DrawerMenuItem("preach_mode", "Preach Mode", Icons.Outlined.PlayArrow),
+            DrawerMenuItem("sermons", "Calendar", Icons.Outlined.MenuBook),
             DrawerMenuItem("notes", "Notes", Icons.Outlined.Description),
             DrawerMenuItem("sermon_ideas", "Sermon Ideas", Icons.Outlined.Lightbulb),
             DrawerMenuItem("illustration_library", "Illustrations", Icons.Outlined.LibraryBooks),
             DrawerMenuItem("file_list", "Library", Icons.Outlined.FolderOpen),
             DrawerMenuItem("ai_editor", "AI Tools", Icons.Outlined.AutoAwesome),
+            DrawerMenuItem("history", "History", Icons.Outlined.History),
             DrawerMenuItem("settings", "Settings", Icons.Outlined.Settings),
             DrawerMenuItem("profile", "Profile", Icons.Outlined.Person)
         )
@@ -173,7 +174,7 @@ fun PushRevealDrawer(
                                 )
                                 .clickable {
                                     onClose()
-                                    val topLevelRoutes = listOf("home", "settings", "sermons", "preach_mode", "file_list", "ai_editor", "sermon_ideas")
+                                    val topLevelRoutes = listOf("home", "settings", "sermons", "file_list", "ai_editor", "sermon_ideas", "history")
                                     if (item.id in topLevelRoutes || item.id.startsWith("notes") || item.id == "illustration_library") {
                                         onNavigate(item.id)
                                     } else {
@@ -405,7 +406,7 @@ fun ProfileDialog(
                         focusedBorderColor = ShepherdGold,
                         focusedLabelColor = ShepherdGold
                     ),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().keyboardAware()
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -780,8 +781,8 @@ fun HelpDialog(
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("👼 **Push-Reveal Drawer**\nSwipe right from the left edge or tap the menu icon to reveal. Tap the main screen sliver or swipe back to close.", fontSize = 12.sp)
-                    Text("📜 **Preach Mode**\nSelect an outline and tap 'Launch in Preach Mode' to open a fluid teleprompter with auto-scroll optimized for the pulpit.", fontSize = 12.sp)
                     Text("🤖 **AI Study Prep**\nFormat sermon drafts, auto-tag scripture scriptures, and structure studies with Uriel, your smart study assistant.", fontSize = 12.sp)
+                    Text("📜 **Activity History**\nTrack all your pastoral preparations and file movements in a unified timeline.", fontSize = 12.sp)
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))

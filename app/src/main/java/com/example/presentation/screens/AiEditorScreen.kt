@@ -38,10 +38,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.remote.FormatMode
 import com.example.presentation.components.bounceClickable
+import com.example.presentation.components.keyboardAware
 import com.example.presentation.viewmodel.ShepherdViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AiEditorScreen(
@@ -82,8 +86,6 @@ fun AiEditorScreen(
     var showMoreActions by remember { mutableStateOf(false) }
     var triggerBounce by remember { mutableStateOf(false) }
     var showPrayerTimerModal by remember { mutableStateOf(false) }
-    var showThemeDrafterDialog by remember { mutableStateOf(false) }
-    var showScriptureIntelDialog by remember { mutableStateOf(false) }
     var activeIntelScripture by remember { mutableStateOf("") }
     var showTableDialog by remember { mutableStateOf(false) }
     var tableRequest by remember { mutableStateOf("") }
@@ -129,7 +131,7 @@ fun AiEditorScreen(
     }
 
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().imePadding(),
         topBar = {
             TopAppBar(
                 title = { Text("Uriel AI Study Tools", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold) },
@@ -179,7 +181,7 @@ fun AiEditorScreen(
                             viewModel.updateAiInput(it.text)
                         },
                         placeholder = { Text("Example: Draft a 5-point outline for a sermon on 'Faith in Trials' based on James 1:2-4...", fontSize = 14.sp) },
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp).keyboardAware(),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
@@ -290,86 +292,7 @@ fun AiEditorScreen(
                 }
             }
 
-            // 4. Floating Active Uriel streaming output block
-            if (urielIsGenerating || urielResult.isNotEmpty()) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
-                    border = BorderStroke(1.5.dp, Color(0xFFF59E0B))
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Book, contentDescription = null, tint = Color(0xFFF59E0B))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    "Uriel Insights: $urielActiveType",
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFFF59E0B),
-                                    fontSize = 13.sp
-                                )
-                            }
-                            if (urielIsGenerating) {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color(0xFFF59E0B), strokeWidth = 2.dp)
-                            }
-                        }
 
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Reference Word: \"$urielSelectedWord\"",
-                            fontSize = 11.sp,
-                            color = Color.LightGray,
-                            fontStyle = FontStyle.Italic
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Text(
-                            text = urielResult,
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            lineHeight = 19.sp
-                        )
-
-                        if (urielResult.isNotEmpty() && !urielIsGenerating) {
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // Append researched notes straight into notes field!
-                                Button(
-                                    onClick = {
-                                        val separator = if (inputText.trim().isEmpty()) "" else "\n\n"
-                                        val insightHeader = "### Uriel Research on '$urielSelectedWord' ($urielActiveType):\n"
-                                        viewModel.updateAiInput("$inputText$separator$insightHeader$urielResult")
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B)),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.padding(end = 8.dp)
-                                ) {
-                                    Icon(Icons.Default.AddCircle, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Add to Notes", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
-
-                                TextButton(
-                                    onClick = {
-                                        clipboardManager.setText(AnnotatedString(urielResult))
-                                    }
-                                ) {
-                                    Text("Copy", color = Color.White, fontSize = 11.sp)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
 
             // 5. Detected Scripture references (Scripture Intelligence)
             if (detectedScriptures.isNotEmpty()) {
@@ -409,8 +332,7 @@ fun AiEditorScreen(
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(Color(0xFFE0F2FE))
                                         .clickable {
-                                            activeIntelScripture = scripture
-                                            showScriptureIntelDialog = true
+                                            onNavigate("scripture_intelligence")
                                         }
                                         .padding(horizontal = 10.dp, vertical = 6.dp)
                                 ) {
@@ -426,100 +348,119 @@ fun AiEditorScreen(
                 }
             }
 
-            // 6. Practical Tool buttons: Theme Drafter & Bible Cache List
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Card(
-                    modifier = Modifier
-                        .weight(1f)
-                        .bounceClickable { showThemeDrafterDialog = true },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+            // 6. Practical Tool buttons: Theme Drafter, Scripture Intel, Table Builder & Notebook
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Column(
+                    Card(
                         modifier = Modifier
-                            .padding(12.dp)
-                            .fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .weight(1f)
+                            .bounceClickable { onNavigate("theme_drafter") },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
                     ) {
-                        Icon(Icons.Default.Psychology, contentDescription = null, tint = Color(0xFF8B5CF6), modifier = Modifier.size(24.dp))
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("Theme Drafter", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1B2B4B))
-                        Text("Brainstorm thematic angles", fontSize = 9.sp, color = Color.Gray, textAlign = TextAlign.Center)
+                        Column(
+                            modifier = Modifier
+                                .padding(12.dp)
+                                .fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(Icons.Default.Psychology, contentDescription = null, tint = Color(0xFF8B5CF6), modifier = Modifier.size(24.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Theme Drafter", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1B2B4B))
+                            Text("Brainstorm thematic angles", fontSize = 9.sp, color = Color.Gray, textAlign = TextAlign.Center)
+                        }
+                    }
+
+                    Card(
+                        modifier = Modifier
+                            .weight(1f)
+                            .bounceClickable { onNavigate("scripture_intelligence") },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .padding(12.dp)
+                                .fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(
+                                Icons.Default.MenuBook,
+                                contentDescription = null,
+                                tint = Color(0xFF0EA5E9),
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                "Scripture Intel",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF1B2B4B)
+                            )
+                            Text(
+                                "Deep scripture analyst",
+                                fontSize = 9.sp,
+                                color = Color.Gray,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
 
-                Card(
-                    modifier = Modifier
-                        .weight(1f)
-                        .bounceClickable {
-                            // Quick scan notes for scriptures
-                            if (detectedScriptures.isNotEmpty()) {
-                                activeIntelScripture = detectedScriptures.first()
-                                showScriptureIntelDialog = true
-                            } else {
-                                activeIntelScripture = "John 3:16"
-                                showScriptureIntelDialog = true
-                            }
-                        },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .padding(12.dp)
-                            .fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            Icons.Default.MenuBook,
-                            contentDescription = null,
-                            tint = Color(0xFF0EA5E9),
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            "Scripture Intel",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1B2B4B)
-                        )
-                        Text(
-                            "Deep scripture analyst",
-                            fontSize = 9.sp,
-                            color = Color.Gray,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-                Card(
+                    Card(
                         modifier = Modifier
                             .weight(1f)
                             .bounceClickable {
                                 tableRequest = ""
                                 showTableDialog = true
                             },
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                border = BorderStroke(1.dp, Color(0xFFE2E8F0))
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .padding(12.dp)
-                            .fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
                     ) {
-                        Icon(Icons.Default.TableChart, contentDescription = null, tint = Color(0xFFDB2777), modifier = Modifier.size(24.dp))
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("Table Builder", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1B2B4B))
-                        Text("Turn notes into a table", fontSize = 9.sp, color = Color.Gray, textAlign = TextAlign.Center)
+                        Column(
+                            modifier = Modifier
+                                .padding(12.dp)
+                                .fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(Icons.Default.TableChart, contentDescription = null, tint = Color(0xFFDB2777), modifier = Modifier.size(24.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Table Builder", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1B2B4B))
+                            Text("Turn notes into a table", fontSize = 9.sp, color = Color.Gray, textAlign = TextAlign.Center)
+                        }
+                    }
+
+                    Card(
+                        modifier = Modifier
+                            .weight(1f)
+                            .bounceClickable { onNavigate("notes") },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .padding(12.dp)
+                                .fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(Icons.Default.Description, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(24.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Notebook", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1B2B4B))
+                            Text("Open pastoral notes", fontSize = 9.sp, color = Color.Gray, textAlign = TextAlign.Center)
+                        }
                     }
                 }
-
             }
 
             // 7. Local Bible Cache System (Offline persistence list)
@@ -871,6 +812,7 @@ fun AiEditorScreen(
                 modifier = Modifier
                     .padding(24.dp)
                     .fillMaxWidth()
+                    .imePadding()
             ) {
                 Text(
                     "Export formatted resource",
@@ -886,7 +828,7 @@ fun AiEditorScreen(
                     value = saveTitle,
                     onValueChange = { saveTitle = it },
                     label = { Text("Document Title") },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().keyboardAware(),
                     singleLine = true
                 )
 
@@ -1052,95 +994,7 @@ fun AiEditorScreen(
         )
     }
 
-    // Modal: Theme Drafter Dialog
-    if (showThemeDrafterDialog) {
-        var drafterTopic by remember { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { showThemeDrafterDialog = false },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Psychology, contentDescription = null, tint = Color(0xFF8B5CF6))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Uriel Theme Drafter", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
-                }
-            },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        "Input a story, central scripture passage, or topic, and Uriel will draft 4-5 core preaching themes, central truths, and applications for you.",
-                        fontSize = 12.sp,
-                        color = Color.DarkGray
-                    )
-
-                    OutlinedTextField(
-                        value = drafterTopic,
-                        onValueChange = { drafterTopic = it },
-                        placeholder = { Text("e.g. David and Goliath, or Romans 12:1-2", fontSize = 12.sp) },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Button(
-                        onClick = { viewModel.generateUrielThemeDraft(drafterTopic) },
-                        enabled = drafterTopic.isNotBlank() && !urielThemeIsGenerating,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Draft Themes")
-                    }
-
-                    if (urielThemeIsGenerating || urielThemeDraftResult.isNotEmpty()) {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F3FF)),
-                            border = BorderStroke(1.dp, Color(0xFFDDD6FE))
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("Brainstormed Themes Angle", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFF6D28D9))
-                                    if (urielThemeIsGenerating) {
-                                        CircularProgressIndicator(modifier = Modifier.size(12.dp), color = Color(0xFF8B5CF6), strokeWidth = 2.dp)
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(urielThemeDraftResult, fontSize = 12.sp, color = Color.DarkGray, lineHeight = 17.sp)
-
-                                if (urielThemeDraftResult.isNotEmpty() && !urielThemeIsGenerating) {
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                                        Button(
-                                            onClick = {
-                                                val sep = if (inputText.trim().isEmpty()) "" else "\n\n"
-                                                viewModel.updateAiInput("$inputText$sep### Uriel Brainstormed Preaching Themes:\n$urielThemeDraftResult")
-                                                showThemeDrafterDialog = false
-                                            },
-                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6)),
-                                            shape = RoundedCornerShape(8.dp)
-                                        ) {
-                                            Text("Insert into Notebook", fontSize = 10.sp)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showThemeDrafterDialog = false }) {
-                    Text("Close")
-                }
-            }
-        )
-    }
-// Modal: Table Builder Dialog
+    // Modal: Table Builder Dialog
     if (showTableDialog) {
         val tableResult by viewModel.tableResult.collectAsState()
         val tableIsGenerating by viewModel.tableIsGenerating.collectAsState()
@@ -1176,7 +1030,7 @@ fun AiEditorScreen(
                                 fontSize = 12.sp
                             )
                         },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().keyboardAware(),
                         minLines = 2
                     )
 
@@ -1215,34 +1069,27 @@ fun AiEditorScreen(
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = tableResult,
-                                    fontSize = 12.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    color = Color.DarkGray,
-                                    lineHeight = 17.sp
-                                )
+
+                                val parsedRows = remember(tableResult) { parseMarkdownTable(tableResult) }
+
+                                when {
+                                    parsedRows != null -> AiComparisonTable(rows = parsedRows)
+                                    tableResult.isNotEmpty() -> Text(
+                                        text = tableResult,
+                                        fontSize = 12.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = Color.DarkGray,
+                                        lineHeight = 17.sp
+                                    )
+                                }
 
                                 if (tableResult.isNotEmpty() && !tableIsGenerating) {
                                     Spacer(modifier = Modifier.height(10.dp))
                                     Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                                        TextButton(
-                                            onClick = { clipboardManager.setText(AnnotatedString(tableResult)) }
-                                        ) {
+                                        TextButton(onClick = { clipboardManager.setText(AnnotatedString(tableResult)) }) {
                                             Text("Copy", fontSize = 11.sp)
                                         }
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Button(
-                                            onClick = {
-                                                val sep = if (inputText.trim().isEmpty()) "" else "\n\n"
-                                                viewModel.updateAiInput("$inputText$sep$tableResult")
-                                                showTableDialog = false
-                                            },
-                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDB2777)),
-                                            shape = RoundedCornerShape(8.dp)
-                                        ) {
-                                            Text("Insert into Notebook", fontSize = 10.sp)
-                                        }
+
                                     }
                                 }
                             }
@@ -1257,117 +1104,88 @@ fun AiEditorScreen(
             }
         )
     }
-    // Modal: Scripture Intelligence Dialog
-    if (showScriptureIntelDialog) {
-        var intelOption by remember { mutableStateOf("Verse Explanation") }
-        AlertDialog(
-            onDismissRequest = { showScriptureIntelDialog = false },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.MenuBook, contentDescription = null, tint = Color(0xFF10B981))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Scripture Intelligence", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
-                }
-            },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        "Scripture Reference: \"$activeIntelScripture\"",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF065F46)
-                    )
+}
+@Composable
+private fun AiComparisonTable(rows: List<List<String>>) {
+    val columnCount = rows.firstOrNull()?.size ?: return
 
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .border(1.dp, Color(0xFFFBCFE8), RoundedCornerShape(8.dp))
+    ) {
+        rows.forEachIndexed { rowIndex, row ->
+            val isHeader = rowIndex == 0
+            val rowBg = when {
+                isHeader -> Color(0xFFFBCFE8)
+                rowIndex % 2 == 0 -> Color(0xFFFDF2F8)
+                else -> Color.White
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Min)
+                    .background(rowBg)
+            ) {
+                row.forEachIndexed { colIndex, cell ->
                     Text(
-                        "Select research topic for active Scripture:",
+                        text = cell,
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp, vertical = 6.dp),
                         fontSize = 11.sp,
-                        color = Color.Gray
+                        fontWeight = if (isHeader) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isHeader) Color(0xFF9D174D) else Color.DarkGray,
+                        lineHeight = 14.sp
                     )
-
-                    val intelOptions = listOf(
-                        "Verse Explanation",
-                        "Chapter Summary",
-                        "Historical Context",
-                        "Cultural Context",
-                        "Important Themes",
-                        "Original Language Insights",
-                        "Related Prophecies",
-                        "Cross References"
-                    )
-
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        items(intelOptions) { opt ->
-                            val isSel = intelOption == opt
-                            Box(
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(if (isSel) Color(0xFF10B981) else Color(0xFFE2E8F0))
-                                    .clickable {
-                                        intelOption = opt
-                                        viewModel.getUrielScriptureIntelligence(activeIntelScripture, opt)
-                                    }
-                                    .padding(horizontal = 12.dp, vertical = 6.dp)
-                            ) {
-                                Text(opt, color = if (isSel) Color.White else Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
+                    if (colIndex < columnCount - 1) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .width(0.5.dp)
+                                .background(Color(0xFFFBCFE8))
+                        )
                     }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    if (urielIsGenerating || urielResult.isNotEmpty()) {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFECFDF5)),
-                            border = BorderStroke(1.dp, Color(0xFFA7F3D0))
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("Uriel Scripture Research ($intelOption)", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFF047857))
-                                    if (urielIsGenerating) {
-                                        CircularProgressIndicator(modifier = Modifier.size(12.dp), color = Color(0xFF10B981), strokeWidth = 2.dp)
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(urielResult, fontSize = 12.sp, color = Color.DarkGray, lineHeight = 17.sp)
-
-                                if (urielResult.isNotEmpty() && !urielIsGenerating) {
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                                        Button(
-                                            onClick = {
-                                                val sep = if (inputText.trim().isEmpty()) "" else "\n\n"
-                                                viewModel.updateAiInput("$inputText$sep### Uriel Scripture Research on $activeIntelScripture ($intelOption):\n$urielResult")
-                                                showScriptureIntelDialog = false
-                                            },
-                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                                            shape = RoundedCornerShape(8.dp)
-                                        ) {
-                                            Text("Insert into Notebook", fontSize = 10.sp)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showScriptureIntelDialog = false }) {
-                    Text("Close")
                 }
             }
-        )
+
+            if (rowIndex < rows.lastIndex) {
+                Box(modifier = Modifier.fillMaxWidth().height(0.5.dp).background(Color(0xFFFBCFE8)))
+            }
+        }
     }
+}
+/**
+ * Parses a markdown table like:
+ * | Option A | Option B |
+ * |----------|----------|
+ * | Fast     | Cheap    |
+ * Returns null if the text isn't a valid markdown table (falls back to raw text).
+ */
+private fun parseMarkdownTable(raw: String): List<List<String>>? {
+    val lines = raw.lines()
+        .map { it.trim() }
+        .filter { it.isNotBlank() && it.contains("|") }
+
+    if (lines.size < 2) return null
+
+    fun splitRow(line: String) = line.trim('|').split("|").map { it.trim() }
+
+    // Row 1 must be the markdown separator: |---|:---:|---|
+    val isSeparatorRow = splitRow(lines[1]).all { it.matches(Regex("^:?-+:?$")) }
+    if (!isSeparatorRow) return null
+
+    val header = splitRow(lines[0])
+    val colCount = header.size
+
+    val dataRows = lines.drop(2).map { line ->
+        val cells = splitRow(line)
+        when {
+            cells.size == colCount -> cells
+            cells.size > colCount -> cells.take(colCount)
+            else -> cells + List(colCount - cells.size) { "" }
+        }
+    }
+
+    return listOf(header) + dataRows
 }

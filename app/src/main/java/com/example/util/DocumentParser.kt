@@ -20,7 +20,7 @@ object DocumentParser {
     class UnsupportedFormatException(message: String) : Exception(message)
 
     val VERSE_REGEX = Regex(
-        """(?:(?:1|2|3)\s)?[A-Za-z]+\.?\s\d{1,3}:\d{1,3}(?:-\d{1,3})?""",
+        """(?:[1-3]\s)?[A-Za-z]+(?:\s+[A-Za-z]+)*\.?\s\d{1,3}:\d{1,3}(?:-\d{1,3})?(?:\s*[,;]\s*\d{1,3}(?:\s*:\s*\d{1,3})?(?:-\d{1,3})?)*""",
         RegexOption.IGNORE_CASE
     )
 
@@ -340,10 +340,6 @@ object DocumentParser {
 
     /** Annotate a paragraph — detect verses and cues */
     fun annotate(text: String, headingLevel: Int = 0): AnnotatedParagraph {
-        val spans = VERSE_REGEX.findAll(text).map {
-            VerseSpan(it.value, it.range.first, it.range.last + 1)
-        }.toList()
-
         val cueMatch = CUE_REGEX.find(text)
         val cueType = cueMatch?.groupValues?.get(1)?.uppercase()?.let {
             when (it) {
@@ -355,6 +351,12 @@ object DocumentParser {
             }
         }
         val cleanText = if (cueMatch != null) text.replace(cueMatch.value, "").trim() else text
+
+        // Spans must be computed AFTER cue removal, against cleanText — that's what
+        // gets stored as rawText and what span indices are used against downstream.
+        val spans = VERSE_REGEX.findAll(cleanText).map {
+            VerseSpan(it.value, it.range.first, it.range.last + 1)
+        }.toList()
 
         return AnnotatedParagraph(cleanText, spans, cueType, headingLevel)
     }

@@ -38,11 +38,137 @@ import com.example.domain.model.Category
 import com.example.domain.model.ShepherdFile
 import com.example.presentation.components.MinistryBottomBar
 import com.example.presentation.components.OpenFileOptionsBottomSheet
+import com.example.presentation.components.SkeletonItem
 import com.example.presentation.viewmodel.ShepherdViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 
+@Composable
+fun <T> AutoScrollingCategorySlider(
+    categories: List<Category>,
+    files: List<T>,
+    categoryIdOf: (T) -> String?,
+    viewModel: ShepherdViewModel,
+    onNavigateToFileBrowser: () -> Unit,
+    itemsPerPage: Int = 4,
+    autoScrollIntervalMs: Long = 3500L
+) {
+    val pages = remember(categories, itemsPerPage) { categories.chunked(itemsPerPage) }
+    if (pages.isEmpty()) return
+
+    val pagerState = rememberPagerState(pageCount = { pages.size })
+    val isDragged by pagerState.interactionSource.collectIsDraggedAsState()
+
+    LaunchedEffect(pagerState, isDragged, pages.size) {
+        if (pages.size <= 1) return@LaunchedEffect
+        while (true) {
+            delay(autoScrollIntervalMs)
+            if (!isDragged) {
+                val next = (pagerState.currentPage + 1) % pages.size
+                pagerState.animateScrollToPage(next, animationSpec = tween(600))
+            }
+        }
+    }
+
+    Column {
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxWidth(),
+            pageSpacing = 12.dp
+        ) { pageIndex ->
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                pages[pageIndex].chunked(2).forEach { chunk ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        chunk.forEach { category ->
+                            val count = files.count { categoryIdOf(it) == category.id }
+                            CategoryTile(
+                                category = category,
+                                count = count,
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    viewModel.selectCategoryFilter(category.id)
+                                    onNavigateToFileBrowser()
+                                }
+                            )
+                        }
+                        if (chunk.size == 1) Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+
+        if (pages.size > 1) {
+            Spacer(modifier = Modifier.height(8.dp))
+            PagerDotsIndicator(pageCount = pages.size, currentPage = pagerState.currentPage, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+@Composable
+private fun CategoryTile(
+    category: Category,
+    count: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.height(76.dp).clickable(onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFEEB))
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(12.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(text = category.iconEmoji, fontSize = 16.sp)
+            Column {
+                Text(
+                    text = category.name,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1B2B4B),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(text = "$count items", fontSize = 9.sp, color = Color.Gray)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PagerDotsIndicator(pageCount: Int, currentPage: Int, modifier: Modifier = Modifier) {
+    Row(modifier = modifier, horizontalArrangement = Arrangement.Center) {
+        repeat(pageCount) { index ->
+            val selected = index == currentPage
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 3.dp)
+                    .size(if (selected) 8.dp else 6.dp)
+                    .clip(CircleShape)
+                    .background(if (selected) Color(0xFF1B2B4B) else Color(0xFFD9D9D9))
+            )
+        }
+    }
+}
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -63,13 +189,10 @@ fun HomeScreen(
     val pastorName by viewModel.pastorName.collectAsState()
     val seriesList by viewModel.seriesList.collectAsState()
     val upcomingEvents by viewModel.upcomingEvents.collectAsState()
+    val isInitialLoading by viewModel.isInitialLoading.collectAsState()
 
     var showCreateCategorySheet by remember { mutableStateOf(false) }
     var activeOptionsFile by remember { mutableStateOf<ShepherdFile?>(null) }
-
-    // Playback Simulation State (Suggested Mini Player)
-    var isSimulatingPlayback by remember { mutableStateOf(false) }
-    var simulatedPlaybackPosition by remember { mutableStateOf(0.35f) }
 
     // Folder picker launcher for directory CTA
     val folderPicker = rememberLauncherForActivityResult(
@@ -127,9 +250,6 @@ fun HomeScreen(
                     }
                 }
             }
-        },
-        bottomBar = {
-            // Bottom navigation removed as per request
         },
         containerColor = Color.White // Soft Light Page Background
     ) { paddingValues ->
@@ -239,58 +359,76 @@ fun HomeScreen(
                         }
                     }
 
-                    // Featured Hero Card representing latest series
+                    // Featured Hero Card representing latest study category
                     item {
-                        val latestSeries = seriesList.lastOrNull()
-                        val currentSeriesName = latestSeries?.name ?: "Walking In Unending Grace"
-                        val docCount = files.size
-                        val audioCount = files.count { it.extension == "mp3" || it.extension == "wav" }
+                        if (isInitialLoading) {
+                            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                                SkeletonItem(height = 140.dp, shape = RoundedCornerShape(18.dp))
+                            }
+                        } else {
+                            val latestCategory = categories.lastOrNull()
+                            val currentDisplayName = latestCategory?.name ?: "General Study"
+                            val categoryFiles = if (latestCategory != null) {
+                                files.filter { it.categoryId == latestCategory.id }
+                            } else {
+                                files
+                            }
+                            val docCount = categoryFiles.size
+                            val audioCount = categoryFiles.count { it.extension == "mp3" || it.extension == "wav" }
 
-                        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(18.dp),
-                                colors = CardDefaults.cardColors(containerColor = Color(0xFF1B2B4B)) // Navy matches header
-                            ) {
-                                Column(
+                            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                                Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(20.dp),
-                                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                                        .clickable {
+                                            latestCategory?.let {
+                                                viewModel.selectCategoryFilter(it.id)
+                                                onNavigateToFileBrowser()
+                                            }
+                                        },
+                                    shape = RoundedCornerShape(18.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1B2B4B)) // Navy matches header
                                 ) {
-                                    // Top-left: Small pill badge
-                                    Box(
+                                    Column(
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(Color(0xFFF4D35E)) // Warm Yellow badge
-                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                            .fillMaxWidth()
+                                            .padding(20.dp),
+                                        verticalArrangement = Arrangement.spacedBy(14.dp)
                                     ) {
+                                        // Top-left: Small pill badge
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(Color(0xFFF4D35E)) // Warm Yellow badge
+                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                        ) {
+                                            Text(
+                                                text = "LATEST CATEGORY",
+                                                color = Color(0xFF1B2B4B),
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                letterSpacing = 0.5.sp
+                                            )
+                                        }
+
+                                        // Bold White Title
                                         Text(
-                                            text = "LATEST SERIES",
-                                            color = Color(0xFF1B2B4B),
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            letterSpacing = 0.5.sp
+                                            text = currentDisplayName,
+                                            color = Color.White,
+                                            fontSize = 22.sp,
+                                            fontWeight = FontWeight.Black,
+                                            fontFamily = FontFamily.Serif,
+                                            lineHeight = 28.sp
+                                        )
+
+                                        // White Metadata separated by middle dot
+                                        Text(
+                                            text = "$docCount Outlines  •  $audioCount Audio Recs",
+                                            color = Color.White.copy(alpha = 0.65f),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Normal
                                         )
                                     }
-
-                                    // Bold White Title
-                                    Text(
-                                        text = currentSeriesName,
-                                        color = Color.White,
-                                        fontSize = 22.sp,
-                                        fontWeight = FontWeight.Black,
-                                        fontFamily = FontFamily.Serif,
-                                        lineHeight = 28.sp
-                                    )
-
-                                    // White Metadata separated by middle dot
-                                    Text(
-                                        text = "$docCount Outlines  •  $audioCount Audio Recs",
-                                        color = Color.White.copy(alpha = 0.65f),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Normal
-                                    )
                                 }
                             }
                         }
@@ -298,108 +436,121 @@ fun HomeScreen(
 
                     // Stats Row directly under the hero card (No card background)
                     item {
-                        val totalFiles = files.size
-                        val totalCategories = categories.size
-                        val totalBookmarked = bookmarks.size
+                        if (isInitialLoading) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                SkeletonItem(modifier = Modifier.weight(1f), height = 48.dp)
+                                SkeletonItem(modifier = Modifier.weight(1f), height = 48.dp)
+                                SkeletonItem(modifier = Modifier.weight(1f), height = 48.dp)
+                            }
+                        } else {
+                            val totalFiles = files.size
+                            val totalCategories = categories.size
+                            val totalBookmarked = bookmarks.size
 
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp)
-                        ) {
-                            if (totalFiles == 0 && totalCategories == 0 && totalBookmarked == 0) {
-                                // Empty state nudge
-                                Text(
-                                    text = " Add your first sermon outline to populate dashboard statistics",
-                                    color = Color(0xFF1B2B4B),
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Serif,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(Color(0xFFF4D35E).copy(alpha = 0.12f))
-                                        .padding(14.dp)
-                                )
-                            } else {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    // Column 1: Files
-                                    Column(
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                            ) {
+                                if (totalFiles == 0 && totalCategories == 0 && totalBookmarked == 0) {
+                                    // Empty state nudge
+                                    Text(
+                                        text = " Add your first sermon outline to populate dashboard statistics",
+                                        color = Color(0xFF1B2B4B),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Serif,
+                                        textAlign = TextAlign.Center,
                                         modifier = Modifier
-                                            .weight(1f)
-                                            .clickable { onNavigateToFileBrowser() },
-                                        horizontalAlignment = Alignment.CenterHorizontally
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(Color(0xFFF4D35E).copy(alpha = 0.12f))
+                                            .padding(14.dp)
+                                    )
+                                } else {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(
-                                            text = "$totalFiles",
-                                            fontSize = 24.sp,
-                                            fontWeight = FontWeight.Black,
-                                            color = Color(0xFF1B2B4B),
-                                            fontFamily = FontFamily.Serif
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = "Files",
-                                            fontSize = 11.sp,
-                                            color = Color.Gray,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
+                                        // Column 1: Files
+                                        Column(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clickable { onNavigateToFileBrowser() },
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            Text(
+                                                text = "$totalFiles",
+                                                fontSize = 24.sp,
+                                                fontWeight = FontWeight.Black,
+                                                color = Color(0xFF1B2B4B),
+                                                fontFamily = FontFamily.Serif
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = "Files",
+                                                fontSize = 11.sp,
+                                                color = Color.Gray,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
 
-                                    // Divider
-                                    Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.LightGray))
+                                        // Divider
+                                        Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.LightGray))
 
-                                    // Column 2: Categories
-                                    Column(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clickable { onNavigateToFileBrowser() },
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        Text(
-                                            text = "$totalCategories",
-                                            fontSize = 24.sp,
-                                            fontWeight = FontWeight.Black,
-                                            color = Color(0xFF1B2B4B),
-                                            fontFamily = FontFamily.Serif
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = "Categories",
-                                            fontSize = 11.sp,
-                                            color = Color.Gray,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
+                                        // Column 2: Categories
+                                        Column(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clickable { onNavigateToFileBrowser() },
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            Text(
+                                                text = "$totalCategories",
+                                                fontSize = 24.sp,
+                                                fontWeight = FontWeight.Black,
+                                                color = Color(0xFF1B2B4B),
+                                                fontFamily = FontFamily.Serif
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = "Categories",
+                                                fontSize = 11.sp,
+                                                color = Color.Gray,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
 
-                                    // Divider
-                                    Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.LightGray))
+                                        // Divider
+                                        Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.LightGray))
 
-                                    // Column 3: Bookmarked
-                                    Column(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clickable { onNavigateToFileBrowser() },
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        Text(
-                                            text = "$totalBookmarked",
-                                            fontSize = 24.sp,
-                                            fontWeight = FontWeight.Black,
-                                            color = Color(0xFF1B2B4B),
-                                            fontFamily = FontFamily.Serif
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = "Bookmarked",
-                                            fontSize = 11.sp,
-                                            color = Color.Gray,
-                                            fontWeight = FontWeight.Medium
-                                        )
+                                        // Column 3: Bookmarked
+                                        Column(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clickable { onNavigateToFileBrowser() },
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            Text(
+                                                text = "$totalBookmarked",
+                                                fontSize = 24.sp,
+                                                fontWeight = FontWeight.Black,
+                                                color = Color(0xFF1B2B4B),
+                                                fontFamily = FontFamily.Serif
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = "Bookmarked",
+                                                fontSize = 11.sp,
+                                                color = Color.Gray,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -408,87 +559,65 @@ fun HomeScreen(
 
                     // Next Up engagement strip pulling from calendar
                     item {
-                        val nextEvent = upcomingEvents.firstOrNull()
-                        if (nextEvent != null) {
-                            val sdf = remember { SimpleDateFormat("E, d MMM", Locale.getDefault()) }
-                            val dateStr = sdf.format(Date(nextEvent.scheduledDateMs))
-
+                        if (isInitialLoading) {
                             Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(14.dp),
-                                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFDFBF7)),
-                                    border = BorderStroke(1.dp, Color(0xFFF4D35E).copy(alpha = 0.4f))
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(14.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
+                                SkeletonItem(height = 68.dp, shape = RoundedCornerShape(14.dp))
+                            }
+                        } else {
+                            val nextEvent = upcomingEvents.firstOrNull()
+                            if (nextEvent != null) {
+                                val sdf = remember { SimpleDateFormat("E, d MMM", Locale.getDefault()) }
+                                val dateStr = sdf.format(Date(nextEvent.scheduledDateMs))
+
+                                Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(14.dp),
+                                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFDFBF7)),
+                                        border = BorderStroke(1.dp, Color(0xFFF4D35E).copy(alpha = 0.4f))
                                     ) {
                                         Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(40.dp)
-                                                    .clip(RoundedCornerShape(10.dp))
-                                                    .background(Color(0xFF1B2B4B).copy(alpha = 0.08f)),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = dateStr.take(3),
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color(0xFF1B2B4B)
-                                                )
-                                            }
-                                            Spacer(modifier = Modifier.width(12.dp))
-                                            Column {
-                                                Text(
-                                                    text = "NEXT PLACEMENT • $dateStr",
-                                                    fontSize = 9.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color(0xFFE07A5F)
-                                                )
-                                                Text(
-                                                    text = nextEvent.sermonTitle,
-                                                    fontSize = 13.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color(0xFF1B2B4B),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                            }
-                                        }
-
-                                        // Quick access chip to preach mode
-                                        Box(
                                             modifier = Modifier
-                                                .clip(RoundedCornerShape(10.dp))
-                                                .background(Color(0xFF1B2B4B))
-                                                .clickable {
-                                                    viewModel.activeViewerSermonId = nextEvent.sermonId
-                                                    viewModel.activeViewerFilePath = ""
-                                                    viewModel.activeViewerTitle = nextEvent.sermonTitle
-                                                    viewModel.livePreachDurationMinutes = 30
-                                                    onNavigate("preach_mode")
-                                                }
-                                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                                .fillMaxWidth()
+                                                .padding(14.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                modifier = Modifier.weight(1f)
                                             ) {
-                                                Icon(
-                                                    Icons.Default.PlayArrow,
-                                                    contentDescription = null,
-                                                    tint = Color.White,
-                                                    modifier = Modifier.size(12.dp)
-                                                )
-                                                Text("PREACH", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(40.dp)
+                                                        .clip(RoundedCornerShape(10.dp))
+                                                        .background(Color(0xFF1B2B4B).copy(alpha = 0.08f)),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = dateStr.take(3),
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFF1B2B4B)
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.width(12.dp))
+                                                Column {
+                                                    Text(
+                                                        text = "NEXT PLACEMENT • $dateStr",
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFFE07A5F)
+                                                    )
+                                                    Text(
+                                                        text = nextEvent.sermonTitle,
+                                                        fontSize = 13.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFF1B2B4B),
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
                                             }
                                         }
                                     }
@@ -527,61 +656,13 @@ fun HomeScreen(
                                         )
                                     }
                                 } else {
-                                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                        categories.chunked(2).forEach { chunk ->
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                            ) {
-                                                chunk.forEach { category ->
-                                                    val count = files.count { it.categoryId == category.id }
-                                                    Card(
-                                                        modifier = Modifier
-                                                            .weight(1f)
-                                                            .height(76.dp)
-                                                            .clickable {
-                                                                viewModel.selectCategoryFilter(category.id)
-                                                                onNavigateToFileBrowser()
-                                                            },
-                                                        shape = RoundedCornerShape(14.dp),
-                                                        colors = CardDefaults.cardColors(
-                                                            containerColor = Color(0xFFFFFEEB) // soft pastel yellow fill preset
-                                                        )
-                                                    ) {
-                                                        Column(
-                                                            modifier = Modifier
-                                                                .fillMaxSize()
-                                                                .padding(12.dp),
-                                                            verticalArrangement = Arrangement.SpaceBetween
-                                                        ) {
-                                                            Text(
-                                                                text = category.iconEmoji,
-                                                                fontSize = 16.sp
-                                                            )
-                                                            Column {
-                                                                Text(
-                                                                    text = category.name,
-                                                                    fontSize = 12.sp,
-                                                                    fontWeight = FontWeight.Bold,
-                                                                    color = Color(0xFF1B2B4B),
-                                                                    maxLines = 1,
-                                                                    overflow = TextOverflow.Ellipsis
-                                                                )
-                                                                Text(
-                                                                    text = "$count items",
-                                                                    fontSize = 9.sp,
-                                                                    color = Color.Gray
-                                                                )
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                                if (chunk.size == 1) {
-                                                    Spacer(modifier = Modifier.weight(1f))
-                                                }
-                                            }
-                                        }
-                                    }
+                                    AutoScrollingCategorySlider(
+                                        categories = categories,
+                                        files = files,
+                                        categoryIdOf = { it.categoryId },
+                                        viewModel = viewModel,
+                                        onNavigateToFileBrowser = onNavigateToFileBrowser
+                                    )
                                 }
 
                                 // Overlapping FAB anchored to bottom-right corner of categories section

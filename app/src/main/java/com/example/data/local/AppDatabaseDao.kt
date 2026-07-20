@@ -142,37 +142,6 @@ interface AppDatabaseDao {
     suspend fun updateSermonCalendarJobId(eventId: Int, jobId: String)
 
 
-    // --- Preaching Log ---
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertPreachingLog(log: PreachingLogEntity)
-
-    @Query("SELECT * FROM preaching_log ORDER BY datePreachedMs DESC")
-    fun getAllPreachingLogsFlow(): Flow<List<PreachingLogEntity>>
-
-    @Query("SELECT * FROM preaching_log WHERE datePreachedMs BETWEEN :startMs AND :endMs")
-    fun getPreachingLogsBetweenFlow(startMs: Long, endMs: Long): Flow<List<PreachingLogEntity>>
-
-    @Query("SELECT * FROM preaching_log ORDER BY datePreachedMs DESC LIMIT 1")
-    suspend fun getMostRecentPreachingLog(): PreachingLogEntity?
-
-
-    // --- Verse Usage ---
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertVerseUsages(verses: List<VerseUsageEntity>)
-
-    @Query("SELECT * FROM verse_usage WHERE verseReference IN (:refs)")
-    suspend fun findVerseUsageOverlaps(refs: List<String>): List<VerseUsageEntity>
-
-    @Query("DELETE FROM verse_usage WHERE sermonId = :sermonId")
-    suspend fun deleteVerseUsagesForSermon(sermonId: String)
-
-    // --- Preach Mode Cache ---
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertPreachCache(cache: PreachCacheEntity)
-
-    @Query("SELECT * FROM preach_cache WHERE fileHash = :fileHash")
-    suspend fun getPreachCache(fileHash: String): PreachCacheEntity?
-
     // --- Bible Cache ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertBibleCache(cache: BibleCacheEntity)
@@ -182,4 +151,17 @@ interface AppDatabaseDao {
 
     @Query("SELECT * FROM bible_cache ORDER BY timestamp DESC")
     fun getAllBibleCacheFlow(): Flow<List<BibleCacheEntity>>
+
+    // --- PreachCache Queries ---
+    @Query("SELECT * FROM preach_cache WHERE fileHash = :hash")
+    suspend fun getPreachCache(hash: String): PreachCacheEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPreachCache(cache: PreachCacheEntity)
+
+    @Query("DELETE FROM preach_cache WHERE fileHash = :hash")
+    suspend fun deletePreachCache(hash: String)
+
+    @Query("DELETE FROM preach_cache")
+    suspend fun clearPreachCache()
 }

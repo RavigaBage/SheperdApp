@@ -22,12 +22,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.notes.domain.Notebook
 import com.example.notes.domain.Page
+import com.example.presentation.components.SkeletonItem
+import com.example.presentation.components.keyboardAware
 import java.io.File
 
 import androidx.compose.material.icons.filled.*
@@ -36,8 +39,7 @@ import androidx.compose.material.icons.filled.*
 @Composable
 fun NotebookListScreen(
     onBack: () -> Unit,
-    onNavigateToPage: (pageId: String, notebookId: String) -> Unit,
-    onNavigateToPreach: (String, String) -> Unit
+    onNavigateToPage: (pageId: String, notebookId: String) -> Unit
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as com.example.ShepherdApplication
@@ -47,6 +49,15 @@ fun NotebookListScreen(
 
     val notebooks by viewModel.notebooks.collectAsState()
     val selectedNotebook by viewModel.selectedNotebook.collectAsState()
+    val isInitialLoading by viewModel.isInitialLoading.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    
+    LaunchedEffect(Unit) {
+        viewModel.exportStatus.collect { message ->
+            snackbarHostState.showSnackbar(message)
+        }
+    }
+
     var showCreateDialog by remember { mutableStateOf(false) }
     var isSelectionMode by remember { mutableStateOf(false) }
     var selectedPageIds by remember { mutableStateOf(setOf<String>()) }
@@ -62,6 +73,7 @@ fun NotebookListScreen(
     var showStyleDialog by remember { mutableStateOf<com.example.notes.domain.Notebook?>(null) }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { 
@@ -124,9 +136,6 @@ fun NotebookListScreen(
                             IconButton(onClick = { showStyleDialog = notebook }) {
                                 Icon(Icons.Default.Style, contentDescription = "Change Background Style")
                             }
-                            IconButton(onClick = { onNavigateToPreach(notebook.id, notebook.title) }) {
-                                Icon(Icons.Default.PlayArrow, contentDescription = "Preach Notebook")
-                            }
                             IconButton(onClick = { viewModel.exportNotebookAsPdf(context, notebook.id, notebook.title) }) {
                                 Icon(Icons.Default.PictureAsPdf, contentDescription = "Export as PDF")
                             }
@@ -153,34 +162,63 @@ fun NotebookListScreen(
         }
     ) { paddingValues ->
         if (currentNotebook == null) {
-            NotebookGrid(
-                notebooks = notebooks,
-                onNotebookClick = { viewModel.selectNotebook(it) },
-                modifier = Modifier.padding(paddingValues)
-            )
-        } else {
-            PageGrid(
-                pages = sortedPages,
-                isSelectionMode = isSelectionMode,
-                selectedPageIds = selectedPageIds,
-                onPageClick = { page ->
-                    if (isSelectionMode) {
-                        selectedPageIds = if (selectedPageIds.contains(page.id)) {
-                            selectedPageIds - page.id
-                        } else {
-                            selectedPageIds + page.id
-                        }
-                        if (selectedPageIds.isEmpty()) isSelectionMode = false
-                    } else {
-                        onNavigateToPage(page.id, currentNotebook.id)
+            if (isInitialLoading && notebooks.isEmpty()) {
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(160.dp),
+                    contentPadding = PaddingValues(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.padding(paddingValues).fillMaxSize()
+                ) {
+                    items(6) {
+                        SkeletonItem(height = 180.dp, shape = RoundedCornerShape(12.dp))
                     }
-                },
-                onPageLongClick = { page ->
-                    isSelectionMode = true
-                    selectedPageIds = setOf(page.id)
-                },
-                modifier = Modifier.padding(paddingValues)
-            )
+                }
+            } else {
+                NotebookGrid(
+                    notebooks = notebooks,
+                    onNotebookClick = { viewModel.selectNotebook(it) },
+                    modifier = Modifier.padding(paddingValues)
+                )
+            }
+        } else {
+            if (pages.isEmpty()) {
+                // Skeleton for Pages
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(140.dp),
+                    contentPadding = PaddingValues(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.padding(paddingValues).fillMaxSize()
+                ) {
+                    items(8) {
+                        SkeletonItem(height = 200.dp, shape = RoundedCornerShape(8.dp))
+                    }
+                }
+            } else {
+                PageGrid(
+                    pages = sortedPages,
+                    isSelectionMode = isSelectionMode,
+                    selectedPageIds = selectedPageIds,
+                    onPageClick = { page ->
+                        if (isSelectionMode) {
+                            selectedPageIds = if (selectedPageIds.contains(page.id)) {
+                                selectedPageIds - page.id
+                            } else {
+                                selectedPageIds + page.id
+                            }
+                            if (selectedPageIds.isEmpty()) isSelectionMode = false
+                        } else {
+                            onNavigateToPage(page.id, currentNotebook.id)
+                        }
+                    },
+                    onPageLongClick = { page ->
+                        isSelectionMode = true
+                        selectedPageIds = setOf(page.id)
+                    },
+                    modifier = Modifier.padding(paddingValues)
+                )
+            }
         }
     }
 
@@ -245,7 +283,7 @@ fun NotebookListScreen(
                         onValueChange = { title = it },
                         label = { Text("Title") },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth().keyboardAware()
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text("Background Style", style = MaterialTheme.typography.labelMedium)
@@ -401,13 +439,27 @@ fun PageGrid(
                             contentScale = ContentScale.Crop
                         )
                     } else {
-                        Box(
+                        Column(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(Color.White),
-                            contentAlignment = Alignment.Center
+                                .background(Color(0xFFF8F9FA)),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
                         ) {
-                            Text("Empty Page", fontSize = 12.sp, color = Color.Gray)
+                            Icon(
+                                imageVector = Icons.Default.Description,
+                                contentDescription = null,
+                                modifier = Modifier.size(32.dp),
+                                tint = Color.LightGray
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "Tap to start writing",
+                                fontSize = 10.sp,
+                                color = Color.Gray,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 8.dp)
+                            )
                         }
                     }
                     

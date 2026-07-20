@@ -27,6 +27,9 @@ class ShepherdViewModel(
 ) : AndroidViewModel(application) {
 
     // --- Core Files State ---
+    private val _isInitialLoading = MutableStateFlow(true)
+    val isInitialLoading: StateFlow<Boolean> = _isInitialLoading.asStateFlow()
+
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
 
@@ -52,6 +55,16 @@ class ShepherdViewModel(
     init {
         // Sweep anything that's been sitting in Trash past the retention window.
         viewModelScope.launch { repository.purgeExpiredTrash() }
+
+        // Trigger automatic sync on startup if a root folder is already connected
+        if (repository.getRootFolderUri() != null) {
+            syncFiles()
+        }
+
+        viewModelScope.launch {
+            delay(1000) // Artificial delay to ensure UI transition or just to show skeleton
+            _isInitialLoading.value = false
+        }
     }
 
     fun restoreFile(file: ShepherdFile) {
@@ -152,10 +165,6 @@ class ShepherdViewModel(
     var activeViewerIsNote by androidx.compose.runtime.mutableStateOf(false)
     var activeViewerIsNotebookScope by androidx.compose.runtime.mutableStateOf(false)
     var activeViewerAttachmentUris by androidx.compose.runtime.mutableStateOf<List<String>>(emptyList())
-
-    var livePreachDurationMinutes by androidx.compose.runtime.mutableStateOf(45)
-    var livePreachScrollSpeed by androidx.compose.runtime.mutableStateOf(2)
-    var livePreachFontScale by androidx.compose.runtime.mutableStateOf(1.3f)
 
     val sermons: StateFlow<List<Sermon>> = repository.getAllSermons()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -407,6 +416,21 @@ class ShepherdViewModel(
         _prayerTimerSecondsRemaining.value = 0
     }
 
+    fun saveVerseUsage(sermonId: String, sermonTitle: String, verses: List<String>) {
+        // Placeholder for future verse usage tracking logic
+        android.util.Log.d("ShepherdViewModel", "Saving verse usage for $sermonTitle: $verses")
+    }
+
+    fun logPreachingActivity(sermonId: String, sermonTitle: String, type: String, duration: Int, verses: List<String>) {
+        viewModelScope.launch {
+            repository.logActivity(
+                fileName = sermonTitle,
+                action = "Preached for $duration mins using ${verses.size} verses",
+                actionType = ActionType.PREACH
+            )
+        }
+    }
+
     fun updateAiInput(text: String) {
         _aiInputText.value = text
     }
@@ -578,18 +602,12 @@ class ShepherdViewModel(
         }
     }
 
-    // --- Calendar, Preaching Log, & Verse Usage State ---
+    // --- Calendar & Verse Usage State ---
     val upcomingEvents: StateFlow<List<com.example.data.local.SermonCalendarEntity>> = repository.getUpcomingEvents(System.currentTimeMillis())
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _selectedDayEvents = MutableStateFlow<List<com.example.data.local.SermonCalendarEntity>>(emptyList())
     val selectedDayEvents: StateFlow<List<com.example.data.local.SermonCalendarEntity>> = _selectedDayEvents.asStateFlow()
-
-    private val _calendarSearchResults = MutableStateFlow<List<com.example.data.local.PreachingLogEntity>>(emptyList())
-    val calendarSearchResults: StateFlow<List<com.example.data.local.PreachingLogEntity>> = _calendarSearchResults.asStateFlow()
-
-    val preachingHistory: StateFlow<List<com.example.data.local.PreachingLogEntity>> = repository.getPreachingHistory()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun scheduleEvent(context: android.content.Context, event: com.example.data.local.SermonCalendarEntity) {
         viewModelScope.launch {
@@ -615,46 +633,6 @@ class ShepherdViewModel(
         viewModelScope.launch {
             repository.getEventsBetween(startOfDay, endOfDay)
                 .collect { _selectedDayEvents.value = it }
-        }
-    }
-
-    fun searchByNaturalDate(query: String) {
-        val cal = java.util.Calendar.getInstance()
-        val (startMs, endMs) = when {
-            query.contains("easter", true) -> {
-                val y = cal.get(java.util.Calendar.YEAR)
-                val start = java.util.Calendar.getInstance().apply { set(y, 2, 1, 0, 0, 0) }.timeInMillis
-                val end = java.util.Calendar.getInstance().apply { set(y, 3, 30, 23, 59, 59) }.timeInMillis
-                Pair(start, end)
-            }
-            query.contains("christmas", true) -> {
-                val y = cal.get(java.util.Calendar.YEAR)
-                val start = java.util.Calendar.getInstance().apply { set(y, 11, 15, 0, 0, 0) }.timeInMillis
-                val end = java.util.Calendar.getInstance().apply { set(y, 11, 31, 23, 59, 59) }.timeInMillis
-                Pair(start, end)
-            }
-            query.contains("last year", true) -> {
-                cal.add(java.util.Calendar.YEAR, -1)
-                val y = cal.get(java.util.Calendar.YEAR)
-                val start = java.util.Calendar.getInstance().apply { set(y, 0, 1, 0, 0, 0) }.timeInMillis
-                val end = java.util.Calendar.getInstance().apply { set(y, 11, 31, 23, 59, 59) }.timeInMillis
-                Pair(start, end)
-            }
-            else -> {
-                val yearMatch = Regex("\\b(20\\d{2})\\b").find(query)
-                if (yearMatch != null) {
-                    val y = yearMatch.value.toInt()
-                    val start = java.util.Calendar.getInstance().apply { set(y, 0, 1, 0, 0, 0) }.timeInMillis
-                    val end = java.util.Calendar.getInstance().apply { set(y, 11, 31, 23, 59, 59) }.timeInMillis
-                    Pair(start, end)
-                } else {
-                    Pair(0L, 0L)
-                }
-            }
-        }
-        if (startMs == 0L) return
-        viewModelScope.launch {
-            repository.getPreachingByDateRange(startMs, endMs).collect { _calendarSearchResults.emit(it) }
         }
     }
 
@@ -786,53 +764,8 @@ class ShepherdViewModel(
                 return@launch
             }
             _paragraphs.emit(parsed)
-
-            _documentLoadingStatus.emit("Checking for used verse overlaps...")
-            val refs = com.example.util.DocumentParser.extractAllRefs(parsed)
-            if (refs.isNotEmpty()) {
-                val overlaps = repository.checkVerseOverlap(refs)
-                if (overlaps.isNotEmpty()) {
-                    val overlap = overlaps.first()
-                    val dateStr = java.text.SimpleDateFormat("MMM d, yyyy", java.util.Locale.getDefault())
-                        .format(java.util.Date(overlap.datePreachedMs ?: 0L))
-                    _alreadyPreachedWarning.emit(
-                        "${overlap.verseReference} was used in \"${overlap.sermonTitle}\" on $dateStr"
-                    )
-                } else {
-                    _alreadyPreachedWarning.emit(null)
-                }
-            } else {
-                _alreadyPreachedWarning.emit(null)
-            }
+            _alreadyPreachedWarning.emit(null)
             _isDocumentLoading.emit(false)
-        }
-    }
-
-    fun saveVerseUsage(sermonId: String, title: String, verses: List<String>) {
-        viewModelScope.launch {
-            val list = verses.map {
-                com.example.data.local.VerseUsageEntity(
-                    verseReference = it,
-                    sermonId = sermonId,
-                    sermonTitle = title,
-                    datePreachedMs = System.currentTimeMillis()
-                )
-            }
-            repository.saveVerseUsage(list)
-        }
-    }
-
-    fun logPreachingActivity(sermonId: String, title: String, eventName: String?, durationMinutes: Int, verses: List<String>) {
-        viewModelScope.launch {
-            val log = com.example.data.local.PreachingLogEntity(
-                sermonId = sermonId,
-                sermonTitle = title,
-                datePreachedMs = System.currentTimeMillis(),
-                eventName = eventName,
-                durationMinutes = durationMinutes,
-                versesJson = com.squareup.moshi.Moshi.Builder().build().adapter(List::class.java).toJson(verses)
-            )
-            repository.logPreaching(log)
         }
     }
 

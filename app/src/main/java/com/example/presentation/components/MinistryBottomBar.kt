@@ -18,7 +18,6 @@ sealed class NavigationItem(val route: String, val title: String, val icon: Imag
     object Organizer : NavigationItem("sermons", "Organizer", Icons.Default.Book)
     object Calendar : NavigationItem("sermon_calendar", "Calendar", Icons.Default.CalendarMonth)
     object AIPrep : NavigationItem("ai_editor", "AI Prep", Icons.Default.AutoAwesome)
-    object History : NavigationItem("history", "History", Icons.Default.History)
 }
 
 @Composable
@@ -32,8 +31,7 @@ fun MinistryBottomBar(
         NavigationItem.Library,
         NavigationItem.Organizer,
         NavigationItem.Calendar,
-        NavigationItem.AIPrep,
-        NavigationItem.History
+        NavigationItem.AIPrep
     )
 
     NavigationBar(

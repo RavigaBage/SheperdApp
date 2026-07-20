@@ -10,16 +10,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.presentation.components.PushRevealDrawer
+import com.example.presentation.components.MinistryBottomBar
 import com.example.presentation.screens.*
 import com.example.presentation.viewmodel.ShepherdViewModel
 import com.example.ui.theme.MyApplicationTheme
-import com.example.preachmode.PreachModeScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -70,12 +71,11 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier
                             .fillMaxSize()
                             .imePadding(),
-
-                        ) { innerPadding ->
+                        containerColor = Color.White
+                    ) { innerPadding ->
                         NavHost(
                             navController = navController,
                             startDestination = startDestination,
-
                             modifier = Modifier.padding(innerPadding)
                         ) {
                             composable("onboarding") {
@@ -184,15 +184,6 @@ class MainActivity : ComponentActivity() {
                                 onBack = { navController.popBackStack() },
                                 onNavigateToPage = { pageId, notebookId ->
                                     navController.navigate("notes/$notebookId/$pageId")
-                                },
-                                onNavigateToPreach = { notebookId, title ->
-                                    appViewModel.activeViewerSermonId = notebookId
-                                    appViewModel.activeViewerFilePath = ""
-                                    appViewModel.activeViewerTitle = title
-                                    appViewModel.activeViewerIsNote = true
-                                    appViewModel.activeViewerIsNotebookScope = true
-                                    appViewModel.livePreachDurationMinutes = 30
-                                    navController.navigate("preach_mode")
                                 }
                             )
                         }
@@ -209,15 +200,6 @@ class MainActivity : ComponentActivity() {
                                     backStackEntry.savedStateHandle.remove<String>("insert_text")
                                 },
                                 onBack = { navController.popBackStack() },
-                                onNavigateToPreach = { duration ->
-                                    appViewModel.activeViewerSermonId = pageId
-                                    appViewModel.activeViewerFilePath = ""
-                                    appViewModel.activeViewerTitle = "Page Note"
-                                    appViewModel.activeViewerIsNote = true
-                                    appViewModel.activeViewerIsNotebookScope = false
-                                    appViewModel.livePreachDurationMinutes = duration
-                                    navController.navigate("preach_mode")
-                                },
                                 onNavigateToLibrary = {
                                     navController.navigate("illustration_library")
                                 }
@@ -285,26 +267,6 @@ class MainActivity : ComponentActivity() {
                                 sermonId = appViewModel.activeViewerSermonId,
                                 filePath = appViewModel.activeViewerFilePath,
                                 sermonTitle = appViewModel.activeViewerTitle,
-                                onBack = { navController.popBackStack() },
-                                onNavigateToPreach = { id, file, title, duration, speed, scale ->
-                                    appViewModel.activeViewerSermonId = id
-                                    appViewModel.activeViewerFilePath = file
-                                    appViewModel.activeViewerTitle = title
-                                    appViewModel.livePreachDurationMinutes = duration
-                                    navController.navigate("preach_mode")
-                                }
-                            )
-                        }
-
-                        composable("preach_mode") {
-                            PreachModeScreen(
-                                viewModel = appViewModel,
-                                filePath = appViewModel.activeViewerFilePath,
-                                sermonTitle = appViewModel.activeViewerTitle,
-                                durationMinutes = appViewModel.livePreachDurationMinutes,
-                                isNote = appViewModel.activeViewerIsNote,
-                                isNotebookScope = appViewModel.activeViewerIsNotebookScope,
-                                sermonId = appViewModel.activeViewerSermonId,
                                 onBack = { navController.popBackStack() }
                             )
                         }
@@ -327,6 +289,30 @@ class MainActivity : ComponentActivity() {
                             SettingsScreen(
                                 viewModel = appViewModel,
                                 onBack = { navController.popBackStack() }
+                            )
+                        }
+
+                        composable("scripture_intelligence") {
+                            ScriptureIntelligenceScreen(
+                                viewModel = appViewModel,
+                                onBack = {
+                                    navController.navigate("ai_editor") {
+                                        popUpTo("ai_editor") { inclusive = true }
+                                        launchSingleTop = true
+                                    }
+                                }
+                            )
+                        }
+
+                        composable("theme_drafter") {
+                            ThemeDrafterScreen(
+                                viewModel = appViewModel,
+                                onBack = {
+                                    navController.navigate("ai_editor") {
+                                        popUpTo("ai_editor") { inclusive = true }
+                                        launchSingleTop = true
+                                    }
+                                }
                             )
                         }
                     }

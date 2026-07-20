@@ -34,7 +34,7 @@ import com.example.data.file.FileExtensions.toReadableSize
 import com.example.domain.model.Category
 import com.example.domain.model.ShepherdFile
 import com.example.presentation.components.bounceClickable
-import com.example.presentation.components.MinistryBottomBar
+import com.example.presentation.components.keyboardAware
 import com.example.presentation.components.shimmerBrush
 import com.example.presentation.viewmodel.ShepherdViewModel
 import java.text.SimpleDateFormat
@@ -56,6 +56,7 @@ fun FileListScreen(
     onNavigate: (String) -> Unit = {}
 ) {
     val isSyncing by viewModel.isSyncing.collectAsState()
+    val isInitialLoading by viewModel.isInitialLoading.collectAsState()
     val files by viewModel.filteredFiles.collectAsState()
     val categories by viewModel.categories.collectAsState()
     val selectedFileIds by viewModel.selectedFileIds.collectAsState()
@@ -277,7 +278,7 @@ fun FileListScreen(
             }
 
             // 3. Main File lazy list
-            if (isSyncing && files.isEmpty()) {
+            if ((isInitialLoading || isSyncing) && files.isEmpty()) {
                 // Beautiful Skeleton listing loads
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -486,6 +487,7 @@ fun CreateCategoryBottomSheet(
             modifier = Modifier
                 .padding(24.dp)
                 .fillMaxWidth()
+                .imePadding()
         ) {
             Text(
                 "Create Study Folder",
@@ -501,7 +503,7 @@ fun CreateCategoryBottomSheet(
                 value = name,
                 onValueChange = { name = it },
                 label = { Text("Folder Name") },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().keyboardAware(),
                 singleLine = true
             )
 
@@ -588,7 +590,8 @@ private fun RenameFileDialog(
                     value = text,
                     onValueChange = { text = it },
                     singleLine = true,
-                    label = { Text("Name") }
+                    label = { Text("Name") },
+                    modifier = Modifier.keyboardAware()
                 )
                 if (errorMessage != null) {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -631,6 +634,7 @@ private fun CreateFileBottomSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(24.dp)
+                .imePadding()
         ) {
             Text("New File", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 18.sp)
             Spacer(modifier = Modifier.height(16.dp))
@@ -640,7 +644,7 @@ private fun CreateFileBottomSheet(
                 onValueChange = { name = it },
                 label = { Text("File name") },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().keyboardAware()
             )
 
             Spacer(modifier = Modifier.height(16.dp))

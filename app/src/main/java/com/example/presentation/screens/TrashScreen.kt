@@ -25,6 +25,7 @@ import com.example.data.file.FileExtensions.toFileColor
 import com.example.data.file.FileExtensions.toFileIcon
 import com.example.data.file.FileExtensions.toReadableSize
 import com.example.domain.model.ShepherdFile
+import com.example.presentation.components.SkeletonItem
 import com.example.presentation.viewmodel.ShepherdViewModel
 import java.text.SimpleDateFormat
 import java.util.*
@@ -36,6 +37,7 @@ fun TrashScreen(
     onBack: () -> Unit
 ) {
     val trashedFiles by viewModel.trashedFiles.collectAsState()
+    val isInitialLoading by viewModel.isInitialLoading.collectAsState()
     var pendingPermanentDelete by remember { mutableStateOf<ShepherdFile?>(null) }
     var showEmptyTrashConfirm by remember { mutableStateOf(false) }
 
@@ -58,7 +60,23 @@ fun TrashScreen(
             )
         }
     ) { paddingValues ->
-        if (trashedFiles.isEmpty()) {
+        if (isInitialLoading && trashedFiles.isEmpty()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentPadding = PaddingValues(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                items(6) {
+                    SkeletonItem(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                        height = 76.dp,
+                        shape = RoundedCornerShape(14.dp)
+                    )
+                }
+            }
+        } else if (trashedFiles.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()

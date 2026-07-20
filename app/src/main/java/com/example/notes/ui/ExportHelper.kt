@@ -3,12 +3,15 @@ package com.example.notes.ui
 import android.content.Context
 import android.content.Intent
 import android.graphics.Paint
+import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import androidx.core.content.FileProvider
 import androidx.core.graphics.toColorInt
 import com.example.notes.domain.CanvasObject
 import com.example.notes.domain.PageBackgroundStyle
+import com.example.notes.domain.TextStyleSpan
+import com.example.notes.domain.decodeSpans
 import androidx.ink.rendering.android.canvas.CanvasStrokeRenderer
 import androidx.ink.strokes.Stroke
 import androidx.ink.brush.Brush
@@ -61,11 +64,7 @@ object ExportHelper {
                     strokeRenderer.draw(canvas, stroke, android.graphics.Matrix())
                 }
                 is CanvasObject.RichTextObject -> {
-                    val textPaint = Paint().apply {
-                        color = android.graphics.Color.BLACK
-                        textSize = 40f // Simplified
-                    }
-                    canvas.drawText(obj.text, obj.x, obj.y + 40f, textPaint)
+                    drawRichText(canvas, obj)
                 }
                 is CanvasObject.ImageObject -> {
                     // Image drawing logic
@@ -89,16 +88,87 @@ object ExportHelper {
         }
     }
 
+    private fun stylesAt(spans: List<TextStyleSpan>, index: Int): Pair<Boolean, Boolean> {
+        var bold = false
+        var italic = false
+        for (span in spans) {
+            if (index >= span.start && index < span.end) {
+                bold = bold || span.bold
+                italic = italic || span.italic
+            }
+        }
+        return bold to italic
+    }
+
+    private fun drawRichText(canvas: android.graphics.Canvas, obj: CanvasObject.RichTextObject) {
+        val spans = obj.annotatedStringJson.decodeSpans()
+        val lineHeight = 48f
+        var charOffset = 0
+
+        obj.text.split("\n").forEachIndexed { lineIndex, line ->
+            var x = obj.x
+            val y = obj.y + 40f + (lineIndex * lineHeight)
+            var runStart = 0
+            while (runStart < line.length) {
+                val (bold, italic) = stylesAt(spans, charOffset + runStart)
+                var runEnd = runStart
+                while (runEnd < line.length) {
+                    val (b2, i2) = stylesAt(spans, charOffset + runEnd)
+                    if (b2 != bold || i2 != italic) break
+                    runEnd++
+                }
+                val runText = line.substring(runStart, runEnd)
+                val paint = Paint().apply {
+                    color = android.graphics.Color.BLACK
+                    textSize = 40f
+                    isAntiAlias = true
+                    typeface = Typeface.create(
+                        Typeface.DEFAULT,
+                        when {
+                            bold && italic -> Typeface.BOLD_ITALIC
+                            bold -> Typeface.BOLD
+                            italic -> Typeface.ITALIC
+                            else -> Typeface.NORMAL
+                        }
+                    )
+                }
+                canvas.drawText(runText, x, y, paint)
+                x += paint.measureText(runText)
+                runStart = runEnd
+            }
+            charOffset += line.length + 1 // +1 accounts for the '\n' stripped by split()
+        }
+    }
+
     private fun CanvasObject.StrokeObject.toStroke(): Stroke {
+        val family = when (brushFamily) {
+            "Pen" -> StockBrushes.pressurePen()
+            "Brush" -> StockBrushes.marker(StockBrushes.MarkerVersion.V1)
+            else -> StockBrushes.marker(StockBrushes.MarkerVersion.V1)
+        }
         val brush = Brush.createWithColorIntArgb(
-            family = StockBrushes.marker(StockBrushes.MarkerVersion.V1),
-            colorIntArgb = colorHex.toColorInt(),
+            family = family,
+            colorIntArgb = try {
+                android.graphics.Color.parseColor(colorHex)
+            } catch (e: Exception) {
+                android.graphics.Color.BLACK
+            },
             size = brushWidth,
             epsilon = 0.1f
         )
         val builder = MutableStrokeInputBatch()
         points.forEach { p ->
-            builder.add(InputToolType.STYLUS, p.x, p.y, p.timestampMs, p.pressure, p.tiltX, p.tiltY)
+            val safeUnitLength = if (p.strokeUnitLength > 0 && p.strokeUnitLength.isFinite()) p.strokeUnitLength else 1f
+            builder.add(
+                type = InputToolType.STYLUS,
+                x = p.x,
+                y = p.y,
+                elapsedTimeMillis = p.timestampMs,
+                strokeUnitLengthCm = safeUnitLength,
+                pressure = p.pressure,
+                tiltRadians = p.tiltX,
+                orientationRadians = p.tiltY
+            )
         }
         return Stroke(brush, builder)
     }

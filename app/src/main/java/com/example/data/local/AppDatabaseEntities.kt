@@ -257,30 +257,11 @@ data class SermonCalendarEntity(
     val attachmentUrisJson: String? = null
 )
 
-@Entity(tableName = "preaching_log")
-data class PreachingLogEntity(
-    @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    val sermonId: String,               // matches SermonEntity.id
-    val sermonTitle: String,
-    val datePreachedMs: Long,
-    val eventName: String?,
-    val durationMinutes: Int?,
-    val versesJson: String?          
-)
-
-@Entity(tableName = "verse_usage", indices = [androidx.room.Index("verseReference")])
-data class VerseUsageEntity(
-    @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    val verseReference: String,      
-    val sermonId: String,               // matches SermonEntity.id
-    val sermonTitle: String,
-    val datePreachedMs: Long?        
-)
-
 @Entity(tableName = "preach_cache")
 data class PreachCacheEntity(
     @PrimaryKey val fileHash: String,
-    val jsonText: String
+    val jsonText: String,
+    val timestamp: Long = System.currentTimeMillis()
 )
 
 @Entity(tableName = "bible_cache", primaryKeys = ["verseReference", "translation"])

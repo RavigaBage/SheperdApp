@@ -19,7 +19,7 @@ class ShepherdRepository(
     private val context: Context,
     private val database: AppDatabase,
     private val safFileManager: SafFileManager,
-    private val geminiService: GeminiService
+    val geminiService: GeminiService
 ) {
     private val dao = database.dao()
     private val prefs = context.getSharedPreferences("shepherd_prefs", Context.MODE_PRIVATE)
@@ -59,6 +59,19 @@ class ShepherdRepository(
 
     fun getGeminiApiKey(): String = prefs.getString("gemini_api_key", "") ?: ""
     fun setGeminiApiKey(key: String) = prefs.edit().putString("gemini_api_key", key).apply()
+
+    suspend fun logActivity(fileName: String, action: String, actionType: ActionType, fromPath: String? = null, toPath: String? = null) {
+        val entry = HistoryEntry(
+            id = java.util.UUID.randomUUID().toString(),
+            action = action,
+            fileName = fileName,
+            fromPath = fromPath,
+            toPath = toPath,
+            timestamp = System.currentTimeMillis(),
+            actionType = actionType
+        )
+        dao.insertHistory(HistoryEntity.fromDomain(entry))
+    }
 
     // --- Flow Streams ---
     fun getAllFiles(): Flow<List<ShepherdFile>> {
@@ -643,13 +656,6 @@ class ShepherdRepository(
     suspend fun updateEvent(event: SermonCalendarEntity) = dao.updateSermonCalendar(event)
     suspend fun deleteEvent(event: SermonCalendarEntity) = dao.deleteSermonCalendar(event)
     suspend fun updateNotificationJobId(eventId: Int, jobId: String) = dao.updateSermonCalendarJobId(eventId, jobId)
-
-    suspend fun logPreaching(log: PreachingLogEntity) = dao.insertPreachingLog(log)
-    fun getPreachingHistory() = dao.getAllPreachingLogsFlow()
-    fun getPreachingByDateRange(start: Long, end: Long) = dao.getPreachingLogsBetweenFlow(start, end)
-
-    suspend fun checkVerseOverlap(refs: List<String>): List<VerseUsageEntity> = dao.findVerseUsageOverlaps(refs)
-    suspend fun saveVerseUsage(verses: List<VerseUsageEntity>) = dao.insertVerseUsages(verses)
 
     suspend fun getBibleVerse(ref: String, translation: String): String = withContext(Dispatchers.IO) {
         val cached = dao.getBibleCache(ref, translation)

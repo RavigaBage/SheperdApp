@@ -38,6 +38,9 @@ class NotesViewModel(
     private val _backgroundColor = MutableStateFlow("#FFFFFF")
     val backgroundColor: StateFlow<String> = _backgroundColor.asStateFlow()
 
+    private val _exportStatus = MutableSharedFlow<String>()
+    val exportStatus: SharedFlow<String> = _exportStatus.asSharedFlow()
+
     private var initialObjects: List<CanvasObject> = emptyList()
     private var saveJob: Job? = null
     private var isLoaded = false
@@ -84,7 +87,18 @@ class NotesViewModel(
             isLoaded = true
         }
     }
-
+    fun addStroke(id: String, points: List<InkPoint>, colorHex: String, brushWidth: Float) {
+        val nextZ = (_canvasObjects.value.maxOfOrNull { it.zIndex } ?: -1) + 1
+        val newObj = CanvasObject.StrokeObject(
+            id = id,
+            zIndex = nextZ,
+            points = points,
+            colorHex = colorHex,
+            brushWidth = brushWidth,
+            brushFamily = _canvasState.value.penType
+        )
+        addCanvasObject(newObj)
+    }
     fun addCanvasObject(obj: CanvasObject) {
         _canvasObjects.value = (_canvasObjects.value + obj).sortedBy { it.zIndex }
     }
@@ -141,15 +155,15 @@ class NotesViewModel(
         }
     }
 
-    fun insertTextAt(x: Float, y: Float, text: String = "") {
+    fun insertTextAt(x: Float, y: Float, canvasWidthPx: Float, text: String = "") {
         val nextZ = (_canvasObjects.value.maxOfOrNull { it.zIndex } ?: -1) + 1
         val newObj = CanvasObject.RichTextObject(
             id = UUID.randomUUID().toString(),
             zIndex = nextZ,
-            x = x,
-            y = y,
-            width = 400f,
-            height = 100f,
+            x = 0f,                // always flush left, ignore tapped x
+            y = y,                 // keep tapped vertical position
+            width = canvasWidthPx, // always span full canvas width
+            height = 100f,         // your existing default; auto-expands with content presumably
             text = text
         )
         addCanvasObject(newObj)
@@ -240,12 +254,6 @@ class NotesViewModel(
                 repository.syncElements(pageId, currentObjects)
             }
             onComplete()
-        }
-    }
-
-    fun exportToPdf(context: android.content.Context, uri: android.net.Uri) {
-        viewModelScope.launch(Dispatchers.IO) {
-            ExportHelper.renderCanvasToPdf(context, _canvasObjects.value, _backgroundColor.value, _backgroundStyle.value, uri)
         }
     }
 

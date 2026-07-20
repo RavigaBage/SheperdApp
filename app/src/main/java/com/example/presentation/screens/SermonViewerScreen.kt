@@ -51,8 +51,7 @@ fun SermonViewerScreen(
     sermonId: String,
     filePath: String,
     sermonTitle: String,
-    onBack: () -> Unit,
-    onNavigateToPreach: (String, String, String, Int, Int, Float) -> Unit
+    onBack: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -84,11 +83,6 @@ fun SermonViewerScreen(
     var showSetupSheet by remember { mutableStateOf(false) }
     var showSavedConfirmation by remember { mutableStateOf(false) }
     var selectedVerseForPopup by remember { mutableStateOf<String?>(null) }
-
-    // Preach Mode Configuration sheet states
-    var durationMinutes by remember { mutableStateOf(45) }
-    var scrollSpeed by remember { mutableStateOf(2) }
-    var fontScaleMultiplier by remember { mutableStateOf(1.3f) }
 
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
 
@@ -531,23 +525,6 @@ fun SermonViewerScreen(
                             tint = Color.Black
                         )
                     }
-
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Preach Mode Options") },
-                            onClick = {
-                                showMenu = false
-                                viewModel.activeViewerIsNote = false
-                                showSetupSheet = true
-                            },
-                            leadingIcon = {
-                                Icon(Icons.Default.PlayArrow, contentDescription = null)
-                            }
-                        )
-                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent
@@ -700,39 +677,6 @@ fun SermonViewerScreen(
                 .padding(paddingValues)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // "Already Preached" Warning banner
-                warning?.let { warnMsg ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFFFFF8E1),
-                            contentColor = Color(0xFF5D4037)
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "⚠️",
-                                fontSize = 20.sp,
-                                modifier = Modifier.padding(end = 8.dp)
-                            )
-                            Text(
-                                warnMsg,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-                }
-
                 // Main Reading content
                 if (isDocumentLoading) {
                     Box(
@@ -954,108 +898,6 @@ fun SermonViewerScreen(
             verseReference = verseRef,
             onDismiss = { selectedVerseForPopup = null }
         )
-    }
-
-    // Interactive Preach Configuration modal bottom sheet
-    if (showSetupSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showSetupSheet = false },
-            containerColor = MaterialTheme.colorScheme.surface
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp)
-                    .navigationBarsPadding(),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    "Setup Preaching Mode",
-                    fontFamily = FontFamily.Serif,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                HorizontalDivider()
-
-                // Slider 1: Timer Duration
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Sermon Duration", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                        Text("$durationMinutes Mins", fontSize = 14.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                    }
-                    Slider(
-                        value = durationMinutes.toFloat(),
-                        onValueChange = { durationMinutes = it.toInt() },
-                        valueRange = 10f..120f,
-                        steps = 11
-                    )
-                }
-
-                // Slider 2: Autoscroll speed
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Prompter Auto-scroll Speed", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                        Text("Speed $scrollSpeed", fontSize = 14.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                    }
-                    Slider(
-                        value = scrollSpeed.toFloat(),
-                        onValueChange = { scrollSpeed = it.toInt() },
-                        valueRange = 1f..5f,
-                        steps = 3
-                    )
-                }
-
-                // Slider 3: Size multiplier
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Text Size Scale", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                        Text("${String.format("%.1f", fontScaleMultiplier)}x", fontSize = 14.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                    }
-                    Slider(
-                        value = fontScaleMultiplier,
-                        onValueChange = { fontScaleMultiplier = it },
-                        valueRange = 1.0f..2.0f
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Button(
-                    onClick = {
-                        showSetupSheet = false
-                        onNavigateToPreach(
-                            sermonId,
-                            filePath,
-                            sermonTitle,
-                            durationMinutes,
-                            scrollSpeed,
-                            fontScaleMultiplier
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    )
-                ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Enter Preach Mode", fontWeight = FontWeight.Bold)
-                }
-            }
-        }
     }
 }
 

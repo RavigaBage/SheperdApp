@@ -63,5 +63,6 @@ data class InkPoint(
     val pressure: Float,
     val tiltX: Float,
     val tiltY: Float,
-    val timestampMs: Long
+    val timestampMs: Long,
+    val strokeUnitLength: Float = 1f
 )

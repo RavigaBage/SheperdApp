@@ -274,4 +274,42 @@ Provide only the corrected and polished text outputs.
             emit("Error: ${e.localizedMessage}")
         }
     }.flowOn(Dispatchers.IO)
+
+    fun generateIdeasStream(topic: String, apiKey: String = ""): Flow<String> = flow {
+        val key = getEffectiveApiKey(apiKey)
+        val model_api = getApiModel()
+        if (key.isEmpty() || key == "MY_GEMINI_API_KEY") {
+            emit("ERROR: API KEY MISSING")
+            return@flow
+        }
+
+        val prompt = """
+            You are a creative theological assistant. Generate 4 concrete sermon/teaching ideas based on the topic: "$topic".
+            
+            MIX: 2 Sermons, 1 Teaching Series, 1 Conference or Seminar idea.
+            
+            Return ONLY a valid JSON array of objects with this EXACT structure:
+            [
+              {
+                "type": "SERMON" | "TEACHING_SERIES" | "CONFERENCE" | "SEMINAR",
+                "title": "Clear catchy title",
+                "scriptureReference": "Book Chapter:Verse",
+                "summary": "1-2 sentence thesis",
+                "outline": ["Point 1", "Point 2", "Point 3"],
+                "suggestedTags": ["tag1", "tag2"]
+              }
+            ]
+            
+            Do not include markdown formatting (like ```json), no preamble, and no explanation. Just the raw JSON array.
+        """.trimIndent()
+
+        try {
+            val model = GenerativeModel(modelName = model_api, apiKey = key)
+            model.generateContentStream(prompt).collect { chunk ->
+                chunk.text?.let { emit(it) }
+            }
+        } catch (e: Exception) {
+            emit("ERROR: ${e.localizedMessage}")
+        }
+    }.flowOn(Dispatchers.IO)
 }

@@ -45,9 +45,9 @@ class SermonReminderWorker(
 
         val snoozeSuffix = if (isSnoozed) " (Snoozed)" else ""
         val title = when (type) {
-            "1day" -> "Preaching Tomorrow$snoozeSuffix"
+            "1day" -> "Sermon Tomorrow$snoozeSuffix"
             "4hours" -> "Sermon in 4 Hours$snoozeSuffix"
-            "now" -> "Time to Preach!$snoozeSuffix"
+            "now" -> "Sermon Time!$snoozeSuffix"
             else -> "Sermon Starting Soon$snoozeSuffix"
         }
 

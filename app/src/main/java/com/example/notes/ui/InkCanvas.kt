@@ -1,5 +1,6 @@
 package com.example.notes.ui
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,13 +26,16 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.ink.authoring.InProgressStrokeId
 import androidx.ink.authoring.compose.InProgressStrokes
 import androidx.ink.brush.Brush
 import androidx.ink.brush.InputToolType
 import androidx.ink.brush.StockBrushes
 import androidx.ink.geometry.ImmutableBox
-import androidx.ink.geometry.Intersection.intersects
-import androidx.ink.geometry.ImmutableVec
+import androidx.ink.geometry.MutableBox
+import androidx.ink.geometry.PartitionedMesh
+import androidx.ink.strokes.StrokeInput
+import androidx.ink.geometry.Angle
 import androidx.ink.geometry.AffineTransform
 import androidx.ink.rendering.android.canvas.CanvasStrokeRenderer
 import androidx.ink.strokes.MutableStrokeInputBatch
@@ -41,13 +45,14 @@ import coil.compose.AsyncImage
 import com.example.notes.domain.*
 import kotlin.math.roundToInt
 
+@SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun InkCanvas(
     objects: List<CanvasObject>,
-    onStrokeFinished: (List<InkPoint>, colorHex: String, brushWidth: Float) -> Unit,
+    onStrokeFinished: (id: String, points: List<InkPoint>, colorHex: String, brushWidth: Float) -> Unit,
     onObjectRemoved: (String) -> Unit,
     onObjectUpdated: (CanvasObject) -> Unit,
-    onEmptySpaceTapped: (Float, Float) -> Unit,
+    onEmptySpaceTapped: (x: Float, y: Float, canvasWidthPx: Float) -> Unit,
     modifier: Modifier = Modifier,
     brushColor: String = "#000000",
     brushSize: Float = 5f,
@@ -61,7 +66,10 @@ fun InkCanvas(
 ) {
     val density = LocalDensity.current
     val strokeRenderer = remember { CanvasStrokeRenderer.create() }
-    
+
+    // Local cache for strokes to prevent flickering during save/load
+    val localPendingStrokes = remember { mutableStateMapOf<String, Stroke>() }
+
     val currentBrush = remember(brushColor, brushSize, canvasMode, penType) {
         val family = when (penType) {
             "Pen" -> StockBrushes.pressurePen()
@@ -78,7 +86,7 @@ fun InkCanvas(
 
     // Cache strokes to avoid re-calculating expensive Stroke objects
     val finishedStrokes = remember(objects) {
-        objects.filterIsInstance<CanvasObject.StrokeObject>().mapNotNull { strokeObj ->
+        val strokeMap = objects.filterIsInstance<CanvasObject.StrokeObject>().mapNotNull { strokeObj ->
             try {
                 strokeObj.id to strokeObj.toStroke()
             } catch (e: Exception) {
@@ -86,6 +94,14 @@ fun InkCanvas(
                 null
             }
         }.toMap()
+
+        // Only drop a pending stroke once its persisted counterpart has *successfully*
+        // been converted and will actually render from `objects`. If conversion fails,
+        // the id won't be in strokeMap.keys, so the local pending copy stays on screen
+        // as a fallback instead of vanishing.
+        localPendingStrokes.keys.retainAll { id -> id !in strokeMap.keys }
+
+        strokeMap
     }
 
     // Stability for callbacks
@@ -99,8 +115,11 @@ fun InkCanvas(
     val updatedOnSelectedObjectChange by rememberUpdatedState(onSelectedObjectChange)
     val updatedOnObjectUpdated by rememberUpdatedState(onObjectUpdated)
 
-    Box(modifier = modifier.fillMaxSize()) {
-        // LAYER 1: Unified Rendering
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        // Canvas width in px, used so tap-created text objects can span edge-to-edge
+        val canvasWidthPx = with(density) { maxWidth.toPx() }
+
+        // LAYER 1: Unified Rendering (Background & Strokes)
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawIntoCanvas { composeCanvas ->
                 val androidCanvas = composeCanvas.nativeCanvas
@@ -112,44 +131,16 @@ fun InkCanvas(
                         strokeRenderer.draw(androidCanvas, stroke, android.graphics.Matrix())
                     }
                 }
+
+                // Draw local pending strokes (not yet synced to ViewModel)
+                localPendingStrokes.values.forEach { stroke ->
+                    strokeRenderer.draw(androidCanvas, stroke, android.graphics.Matrix())
+                }
             }
         }
 
-        // LAYER 2: Non-Stroke Objects (RichText, Images)
-        objects.filter { it !is CanvasObject.StrokeObject }.sortedBy { it.zIndex }.forEach { obj ->
-            when (obj) {
-                is CanvasObject.RichTextObject -> {
-                    RichTextContainer(
-                        textObject = obj,
-                        onUpdate = updatedOnObjectUpdated,
-                        isActive = canvasMode == CanvasMode.TYPE && focusedTextId == obj.id,
-                        isSelected = canvasMode == CanvasMode.SELECT && selectedObjectId == obj.id,
-                        onClick = { 
-                            if (canvasMode == CanvasMode.TYPE) updatedOnFocusedTextChange(obj.id)
-                            else if (canvasMode == CanvasMode.SELECT) updatedOnSelectedObjectChange(obj.id)
-                        }
-                    )
-                }
-                is CanvasObject.ImageObject -> {
-                    AsyncImage(
-                        model = obj.uri,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .offset { IntOffset(obj.x.roundToInt(), obj.y.roundToInt()) }
-                            .size(with(density) { obj.width.toDp() }, with(density) { obj.height.toDp() })
-                            .clickable { if (canvasMode == CanvasMode.SELECT) updatedOnSelectedObjectChange(obj.id) }
-                            .then(
-                                if (canvasMode == CanvasMode.SELECT && selectedObjectId == obj.id) 
-                                    Modifier.border(2.dp, MaterialTheme.colorScheme.primary)
-                                else Modifier
-                            )
-                    )
-                }
-                else -> {}
-            }
-        }
-
-        // LAYER 3: Gesture Interaction
+        // LAYER 2: Gesture Interaction Overlay for Canvas-level events
+        // In TYPE/SELECT mode, this sits BELOW objects to catch background taps
         if (canvasMode == CanvasMode.PEN) {
             InProgressStrokes(
                 defaultBrush = currentBrush,
@@ -157,7 +148,9 @@ fun InkCanvas(
                     strokes.forEach { stroke ->
                         val points = stroke.inputs.toInkPoints()
                         if (points.isNotEmpty()) {
-                            updatedOnStrokeFinished(points, updatedBrushColor, updatedBrushSize)
+                            val id = java.util.UUID.randomUUID().toString()
+                            localPendingStrokes[id] = stroke
+                            updatedOnStrokeFinished(id, points, updatedBrushColor, updatedBrushSize)
                         }
                     }
                 }
@@ -166,68 +159,101 @@ fun InkCanvas(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(canvasMode) {
+                    .pointerInput(canvasMode, canvasWidthPx) {
                         if (canvasMode == CanvasMode.ERASE) {
-                            detectDragGestures { change, _ -> /* ERASE Logic (out of scope) */ }
-                        } else if (canvasMode == CanvasMode.TYPE) {
-                            detectTapGestures { offset ->
-                                val hit = updatedObjects.filterIsInstance<CanvasObject.RichTextObject>()
-                                    .sortedByDescending { it.zIndex }
-                                    .firstOrNull { obj ->
-                                        offset.x in obj.x..(obj.x + obj.width) &&
-                                                offset.y in obj.y..(obj.y + obj.height)
-                                    }
-                                if (hit != null) {
-                                    updatedOnFocusedTextChange(hit.id)
-                                } else {
-                                    updatedOnFocusedTextChange(null)
-                                    updatedOnEmptySpaceTapped(offset.x, offset.y)
-                                }
-                            }
-                        } else if (canvasMode == CanvasMode.SELECT) {
-                            detectTapGestures { offset ->
-                                val hit = updatedObjects.filter { it !is CanvasObject.StrokeObject }
-                                    .sortedByDescending { it.zIndex }
-                                    .firstOrNull { obj ->
-                                        when (obj) {
-                                            is CanvasObject.RichTextObject -> offset.x in obj.x..(obj.x + obj.width) && offset.y in obj.y..(obj.y + obj.height)
-                                            is CanvasObject.ImageObject -> offset.x in obj.x..(obj.x + obj.width) && offset.y in obj.y..(obj.y + obj.height)
-                                            else -> false
+                            detectDragGestures { change, _ ->
+                                change.consume()
+                                val touchPoint = change.position
+                                val eraserRect = MutableBox()
+                                eraserRect.setXBounds(touchPoint.x - 20f, touchPoint.x + 20f)
+                                eraserRect.setYBounds(touchPoint.y - 20f, touchPoint.y + 20f)
+
+                                updatedObjects.filterIsInstance<CanvasObject.StrokeObject>().forEach { strokeObj ->
+                                    finishedStrokes[strokeObj.id]?.let { stroke ->
+                                        if (stroke.shape.computeCoverageIsGreaterThan(eraserRect, 0f)) {
+                                            updatedOnObjectRemoved(strokeObj.id)
                                         }
                                     }
-                                updatedOnSelectedObjectChange(hit?.id)
-                            }
-                        }
-                    }
-                    .pointerInput(canvasMode, selectedObjectId) {
-                        if (canvasMode == CanvasMode.SELECT && selectedObjectId != null) {
-                            detectDragGestures { change, dragAmount ->
-                                change.consume()
-                                updatedObjects.find { it.id == selectedObjectId }?.let { obj ->
-                                    val updated = when (obj) {
-                                        is CanvasObject.RichTextObject -> obj.copy(x = obj.x + dragAmount.x, y = obj.y + dragAmount.y)
-                                        is CanvasObject.ImageObject -> obj.copy(x = obj.x + dragAmount.x, y = obj.y + dragAmount.y)
-                                        else -> obj
-                                    }
-                                    if (updated !== obj) updatedOnObjectUpdated(updated)
                                 }
+                            }
+                        } else if (canvasMode == CanvasMode.TYPE) {
+                            // Tapping background in TYPE mode deselects or creates new text
+                            detectTapGestures { offset ->
+                                updatedOnFocusedTextChange(null)
+                                updatedOnEmptySpaceTapped(offset.x, offset.y, canvasWidthPx)
+                            }
+                        } else if (canvasMode == CanvasMode.SELECT) {
+                            // Tapping background in SELECT mode clears selection
+                            detectTapGestures {
+                                updatedOnSelectedObjectChange(null)
                             }
                         }
                     }
             )
         }
 
-        // LAYER 4: Overlays (Formatting & Selection)
-        if (canvasMode == CanvasMode.TYPE && focusedTextId != null) {
-            updatedObjects.filterIsInstance<CanvasObject.RichTextObject>()
-                .find { it.id == focusedTextId }?.let { obj ->
-                    FormattingToolbar(
-                        textObject = obj,
-                        onUpdate = updatedOnObjectUpdated,
-                        density = density
-                    )
+        // LAYER 3: Non-Stroke Objects (RichText, Images)
+        // Sitting ABOVE the background gesture layer so they can handle their own selection/drags.
+        // We sort by zIndex but put the active/focused object on the very top for gesture priority.
+        objects.filter { it !is CanvasObject.StrokeObject }
+            .sortedBy {
+                if (it.id == focusedTextId || it.id == selectedObjectId) 99999
+                else it.zIndex
+            }
+            .forEach { obj ->
+                key(obj.id) {
+                    when (obj) {
+                        is CanvasObject.RichTextObject -> {
+                            rememberUpdatedState(obj)
+                            RichTextContainer(
+                                textObject = obj,
+                                onUpdate = updatedOnObjectUpdated,
+                                isActive = canvasMode == CanvasMode.TYPE && focusedTextId == obj.id,
+                                isSelected = canvasMode == CanvasMode.SELECT && selectedObjectId == obj.id,
+                                onClick = {
+                                    if (canvasMode == CanvasMode.TYPE) updatedOnFocusedTextChange(obj.id)
+                                    else if (canvasMode == CanvasMode.SELECT) updatedOnSelectedObjectChange(obj.id)
+                                }
+                            )
+                        }
+
+                        is CanvasObject.ImageObject -> {
+                            val latestObj by rememberUpdatedState(obj)
+
+                            AsyncImage(
+                                model = obj.uri,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .offset { IntOffset(obj.x.roundToInt(), obj.y.roundToInt()) }
+                                    .size(with(density) { obj.width.toDp() }, with(density) { obj.height.toDp() })
+                                    .clickable {
+                                        if (canvasMode == CanvasMode.SELECT) updatedOnSelectedObjectChange(obj.id)
+                                        else if (canvasMode == CanvasMode.TYPE) updatedOnFocusedTextChange(null)
+                                    }
+                                    .then(
+                                        if (canvasMode == CanvasMode.SELECT && selectedObjectId == obj.id)
+                                            Modifier.border(2.dp, MaterialTheme.colorScheme.primary)
+                                        else Modifier
+                                    )
+                                    .then(
+                                        if (canvasMode == CanvasMode.SELECT && selectedObjectId == obj.id) {
+                                            Modifier.pointerInput(obj.id) {
+                                                detectDragGestures { change, dragAmount ->
+                                                    change.consume()
+                                                    val current = latestObj
+                                                    updatedOnObjectUpdated(
+                                                        current.copy(x = current.x + dragAmount.x, y = current.y + dragAmount.y)
+                                                    )
+                                                }
+                                            }
+                                        } else Modifier
+                                    )
+                            )
+                        }
+                        else -> {}
+                    }
                 }
-        }
+            }
 
         if (canvasMode == CanvasMode.SELECT && selectedObjectId != null) {
             updatedObjects.find { it.id == selectedObjectId }?.let { obj ->
@@ -254,69 +280,6 @@ fun InkCanvas(
                     onRemove = { updatedOnObjectRemoved(obj.id); updatedOnSelectedObjectChange(null) },
                     density = density
                 )
-            }
-        }
-    }
-}
-
-@Composable
-fun FormattingToolbar(
-    textObject: CanvasObject.RichTextObject,
-    onUpdate: (CanvasObject.RichTextObject) -> Unit,
-    density: Density
-) {
-    val xDp = with(density) { textObject.x.toDp() }
-    val yDp = with(density) { (textObject.y - 50f).toDp() }
-
-    Surface(
-        modifier = Modifier
-            .offset(xDp, yDp)
-            .wrapContentSize(),
-        shape = RoundedCornerShape(8.dp),
-        tonalElevation = 4.dp,
-        shadowElevation = 4.dp
-    ) {
-        Row(modifier = Modifier.padding(4.dp)) {
-            IconButton(onClick = { onUpdate(textObject.copy(isBold = !textObject.isBold)) }) {
-                Icon(
-                    Icons.Default.FormatBold,
-                    contentDescription = "Bold",
-                    tint = if (textObject.isBold) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                )
-            }
-            IconButton(onClick = { onUpdate(textObject.copy(isItalic = !textObject.isItalic)) }) {
-                Icon(
-                    Icons.Default.FormatItalic,
-                    contentDescription = "Italic",
-                    tint = if (textObject.isItalic) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                )
-            }
-            IconButton(onClick = { 
-                val lines = textObject.text.lines()
-                val isBullet = lines.all { it.trimStart().startsWith("• ") }
-                val newText = if (isBullet) {
-                    lines.joinToString("\n") { it.trimStart().removePrefix("• ") }
-                } else {
-                    lines.joinToString("\n") { "• $it" }
-                }
-                onUpdate(textObject.copy(text = newText))
-            }) {
-                Icon(Icons.Default.FormatListBulleted, contentDescription = "Bullet List")
-            }
-            IconButton(onClick = {
-                val lines = textObject.text.lines()
-                val isNumbered = lines.firstOrNull()?.trimStart()?.let { 
-                    it.isNotEmpty() && it[0].isDigit() && it.contains(". ")
-                } ?: false
-                
-                val newText = if (isNumbered) {
-                    lines.joinToString("\n") { it.replaceFirst(Regex("^\\s*\\d+\\.\\s*"), "") }
-                } else {
-                    lines.mapIndexed { index, s -> "${index + 1}. $s" }.joinToString("\n")
-                }
-                onUpdate(textObject.copy(text = newText))
-            }) {
-                Icon(Icons.Default.FormatListNumbered, contentDescription = "Numbered List")
             }
         }
     }
@@ -396,8 +359,13 @@ fun BoxScope.ResizeHandle(
 private data class Rect(val x: Float, val y: Float, val width: Float, val height: Float)
 
 private fun CanvasObject.StrokeObject.toStroke(): Stroke {
+    val family = when (brushFamily) {
+        "Pen" -> StockBrushes.pressurePen()
+        "Brush" -> StockBrushes.marker(StockBrushes.MarkerVersion.V1)
+        else -> StockBrushes.marker(StockBrushes.MarkerVersion.V1)
+    }
     val brush = Brush.createWithColorIntArgb(
-        family = StockBrushes.marker(StockBrushes.MarkerVersion.V1),
+        family = family,
         colorIntArgb = try {
             android.graphics.Color.parseColor(colorHex)
         } catch (e: Exception) {
@@ -411,7 +379,17 @@ private fun CanvasObject.StrokeObject.toStroke(): Stroke {
         builder.add(InputToolType.STYLUS, 0f, 0f, 0L, 0f, 0f, 0f)
     } else {
         points.forEach { p ->
-            builder.add(InputToolType.STYLUS, p.x, p.y, p.timestampMs, p.pressure, p.tiltX, p.tiltY)
+            val safeUnitLength = if (p.strokeUnitLength > 0 && p.strokeUnitLength.isFinite()) p.strokeUnitLength else 1f
+            builder.add(
+                type = InputToolType.STYLUS,
+                x = p.x,
+                y = p.y,
+                elapsedTimeMillis = p.timestampMs,
+                strokeUnitLengthCm = safeUnitLength,
+                pressure = p.pressure,
+                tiltRadians = p.tiltX,
+                orientationRadians = p.tiltY
+            )
         }
     }
     return Stroke(brush, builder)
@@ -421,7 +399,19 @@ private fun StrokeInputBatch.toInkPoints(): List<InkPoint> {
     val points = mutableListOf<InkPoint>()
     for (i in 0 until size) {
         val input = get(i)
-        points.add(InkPoint(input.x, input.y, input.pressure, input.tiltRadians, input.orientationRadians, input.elapsedTimeMillis))
+        val rawUnitLength = input.strokeUnitLengthCm
+        val safeUnitLength = if (rawUnitLength > 0 && rawUnitLength.isFinite()) rawUnitLength else 1f
+        points.add(
+            InkPoint(
+                input.x,
+                input.y,
+                input.pressure,
+                input.tiltRadians,
+                input.orientationRadians,
+                input.elapsedTimeMillis,
+                safeUnitLength
+            )
+        )
     }
     return points
 }

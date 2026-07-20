@@ -41,9 +41,7 @@ sealed class CanvasObject {
         val width: Float,
         val height: Float,
         val text: String,
-        val annotatedStringJson: String? = null, // Serialized for persistent rich formatting
-        val isBold: Boolean = false,
-        val isItalic: Boolean = false
+        val annotatedStringJson: String? = null // now holds encoded TextStyleSpan list — see TextStyleSpan.kt
     ) : CanvasObject()
 
     data class ImageObject(

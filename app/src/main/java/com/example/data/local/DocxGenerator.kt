@@ -1,15 +1,13 @@
 package com.example.data.local
-import org.apache.poi.xwpf.usermodel.Document
-import java.io.ByteArrayOutputStream
+
 import android.content.Context
 import com.example.data.remote.FormatMode
-import org.apache.poi.xwpf.usermodel.ParagraphAlignment
-import org.apache.poi.xwpf.usermodel.XWPFDocument
+import org.apache.poi.xwpf.usermodel.*
 import java.io.File
 import java.io.FileOutputStream
-import java.util.UUID
+import java.util.*
 
-class DocxGenerator(private val context: Context) {
+class DocxGenerator(val context: Context) {
 
     fun generateDocx(formattedText: String, title: String, mode: FormatMode): File {
         val tempFile = File(context.cacheDir, "shepherd_${UUID.randomUUID()}.docx")
@@ -44,10 +42,7 @@ class DocxGenerator(private val context: Context) {
                 for (line in lines) {
                     val trimmed = line.trim()
                     if (trimmed.isEmpty()) {
-                        // Create spacing paragraph
-                        document.createParagraph().apply {
-                            spacingAfter = 150
-                        }
+                        document.createParagraph().apply { spacingAfter = 150 }
                         continue
                     }
 
@@ -57,62 +52,38 @@ class DocxGenerator(private val context: Context) {
                         trimmed.startsWith("# ") -> {
                             paragraph.alignment = ParagraphAlignment.LEFT
                             paragraph.spacingAfter = 200
-                            val run = paragraph.createRun().apply {
-                                isBold = true
-                                fontSize = 18
-                                fontFamily = "Georgia"
-                                setText(cleanMarkdown(trimmed.substring(2)))
-                            }
+                            addStyledRuns(paragraph, trimmed.substring(2), isBoldHeader = true, fontSizeHeader = 18)
                         }
                         trimmed.startsWith("## ") -> {
                             paragraph.alignment = ParagraphAlignment.LEFT
                             paragraph.spacingAfter = 150
-                            val run = paragraph.createRun().apply {
-                                isBold = true
-                                fontSize = 15
-                                fontFamily = "Georgia"
-                                setText(cleanMarkdown(trimmed.substring(3)))
-                            }
+                            addStyledRuns(paragraph, trimmed.substring(3), isBoldHeader = true, fontSizeHeader = 15)
                         }
                         trimmed.startsWith("### ") -> {
                             paragraph.alignment = ParagraphAlignment.LEFT
                             paragraph.spacingAfter = 120
-                            val run = paragraph.createRun().apply {
-                                isBold = true
-                                isItalic = true
-                                fontSize = 13
-                                fontFamily = "Georgia"
-                                setText(cleanMarkdown(trimmed.substring(4)))
-                            }
+                            addStyledRuns(paragraph, trimmed.substring(4), isBoldHeader = true, fontSizeHeader = 13, isItalicHeader = true)
                         }
                         trimmed.startsWith("- ") || trimmed.startsWith("* ") -> {
                             paragraph.alignment = ParagraphAlignment.LEFT
-                            paragraph.indentationLeft = 360 // Indent bullet points
-                            val run = paragraph.createRun().apply {
+                            paragraph.indentationLeft = 360
+                            val bulletRun = paragraph.createRun().apply {
                                 fontSize = 11
                                 fontFamily = "Arial"
-                                setText("• " + cleanMarkdown(trimmed.substring(2)))
+                                setText("• ")
                             }
+                            addStyledRuns(paragraph, trimmed.substring(2))
                         }
                         trimmed.startsWith("> ") || (mode == FormatMode.SERMON && trimmed.startsWith("**Scripture Text:")) -> {
                             paragraph.alignment = ParagraphAlignment.LEFT
-                            paragraph.indentationLeft = 540 // Blockquote style
-                            val run = paragraph.createRun().apply {
-                                isItalic = true
-                                fontSize = 11
-                                fontFamily = "Georgia"
-                                val innerText = if (trimmed.startsWith("> ")) trimmed.substring(2) else trimmed
-                                setText(cleanMarkdown(innerText))
-                            }
+                            paragraph.indentationLeft = 540
+                            val innerText = if (trimmed.startsWith("> ")) trimmed.substring(2) else trimmed
+                            addStyledRuns(paragraph, innerText, isItalicHeader = true)
                         }
                         else -> {
                             paragraph.alignment = ParagraphAlignment.BOTH
                             paragraph.spacingAfter = 100
-                            val run = paragraph.createRun().apply {
-                                fontSize = 11
-                                fontFamily = "Arial"
-                                setText(cleanMarkdown(trimmed))
-                            }
+                            addStyledRuns(paragraph, trimmed)
                         }
                     }
                 }
@@ -122,7 +93,6 @@ class DocxGenerator(private val context: Context) {
                 }
             }
         } catch (e: Throwable) {
-            // Absolute crash resilience: if Apache POI throws a library or linking error, we write a text file
             e.printStackTrace()
             try {
                 tempFile.writeText("=== TITLE: $title ===\nForm: ${mode.name}\n\n$formattedText")
@@ -133,9 +103,53 @@ class DocxGenerator(private val context: Context) {
         return tempFile
     }
 
-
-
-    private fun cleanMarkdown(text: String): String {
-        return text.replace("**", "").replace("*", "").replace("`", "")
+    private fun addStyledRuns(
+        paragraph: XWPFParagraph,
+        text: String,
+        isBoldHeader: Boolean = false,
+        isItalicHeader: Boolean = false,
+        fontSizeHeader: Int = 11,
+        fontFamilyHeader: String = "Arial"
+    ) {
+        val regex = """\*\*(.+?)\*\*""".toRegex()
+        var lastIndex = 0
+        
+        regex.findAll(text).forEach { result ->
+            // Add plain text before match
+            val plainText = text.substring(lastIndex, result.range.first)
+            if (plainText.isNotEmpty()) {
+                paragraph.createRun().apply {
+                    isBold = isBoldHeader
+                    isItalic = isItalicHeader
+                    fontSize = fontSizeHeader
+                    fontFamily = if (isBoldHeader) "Georgia" else fontFamilyHeader
+                    setText(plainText)
+                }
+            }
+            
+            // Add bold match
+            val boldText = result.groupValues[1]
+            paragraph.createRun().apply {
+                isBold = true
+                isItalic = isItalicHeader
+                fontSize = fontSizeHeader
+                fontFamily = if (isBoldHeader) "Georgia" else fontFamilyHeader
+                setText(boldText)
+            }
+            
+            lastIndex = result.range.last + 1
+        }
+        
+        // Add remaining text
+        val remaining = text.substring(lastIndex)
+        if (remaining.isNotEmpty()) {
+            paragraph.createRun().apply {
+                isBold = isBoldHeader
+                isItalic = isItalicHeader
+                fontSize = fontSizeHeader
+                fontFamily = if (isBoldHeader) "Georgia" else fontFamilyHeader
+                setText(remaining)
+            }
+        }
     }
 }

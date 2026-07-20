@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.presentation.components.bounceClickable
+import com.example.presentation.components.keyboardAware
 import com.example.presentation.viewmodel.ShepherdViewModel
 import java.io.File
 import java.io.FileOutputStream
@@ -121,26 +122,7 @@ fun SettingsScreen(
                 }
             }
 
-            // AI Study Configuration
-            Text("AI Study Configuration", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column {
-                    SettingsRow(
-                        icon = Icons.Default.VpnKey,
-                        title = "Gemini API Key",
-                        subtitle = if (geminiApiKey.isEmpty()) "Not set" else "••••••••${geminiApiKey.takeLast(4)}",
-                        onClick = { 
-                            geminiApiKeyInput = geminiApiKey
-                            showGeminiApiKeyDialog = true 
-                        }
-                    )
-                }
-            }
 
             // Action triggers
             Text("Auditing Utilities", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
@@ -154,7 +136,7 @@ fun SettingsScreen(
                     SettingsRow(
                         icon = Icons.Default.CloudDownload,
                         title = "Export Sermon Records to CSV",
-                        subtitle = "Generates spreadsheet CSV file with details of preaching timeline logs",
+                        subtitle = "Generates spreadsheet CSV file with details of sermon timeline logs",
                         onClick = {
                             try {
                                 val downloadsDir = File(context.cacheDir, "sermons_export.csv")
@@ -185,7 +167,7 @@ fun SettingsScreen(
                     value = pastorNameInput,
                     onValueChange = { pastorNameInput = it },
                     label = { Text("Display Name") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().keyboardAware()
                 )
             },
             confirmButton = {
@@ -220,7 +202,7 @@ fun SettingsScreen(
                         value = geminiApiKeyInput,
                         onValueChange = { geminiApiKeyInput = it },
                         label = { Text("API Key") },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth().keyboardAware()
                     )
                 }
             },

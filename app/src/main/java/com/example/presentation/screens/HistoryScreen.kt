@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.domain.model.ActionType
 import com.example.domain.model.HistoryEntry
+import com.example.presentation.components.SkeletonItem
 import com.example.presentation.components.bounceClickable
 import com.example.presentation.components.MinistryBottomBar
 import com.example.presentation.viewmodel.ShepherdViewModel
@@ -37,6 +38,7 @@ fun HistoryScreen(
     onNavigate: (String) -> Unit = {}
 ) {
     val history by viewModel.history.collectAsState()
+    val isInitialLoading by viewModel.isInitialLoading.collectAsState()
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -53,7 +55,19 @@ fun HistoryScreen(
         bottomBar = { },
         containerColor = Color.White
     ) { paddingValues ->
-        if (history.isEmpty()) {
+        if (isInitialLoading && history.isEmpty()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(8) {
+                    SkeletonItem(height = 72.dp, shape = RoundedCornerShape(14.dp))
+                }
+            }
+        } else if (history.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -107,6 +121,7 @@ fun HistoryLogCard(entry: HistoryEntry) {
         ActionType.TAGGED -> Color(0xFF1ABC9C)
         ActionType.RESTORED -> Color(0xFF34495E)
         ActionType.PURGED -> Color(0xFF95A5A6)
+        ActionType.PREACH -> Color(0xFFFF4081) // Pink accent for preaching
     }
 
     Card(

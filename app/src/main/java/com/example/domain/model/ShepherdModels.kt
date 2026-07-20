@@ -4,7 +4,7 @@ import java.io.Serializable
 
 enum class ActionType {
     MOVED, DELETED, CREATED, RENAMED, AI_GENERATED, BOOKMARKED, TAGGED,
-    RESTORED, PURGED // new: Trash restore / auto-purge history entries
+    RESTORED, PURGED, PREACH // new: Trash restore / auto-purge history entries
 }
 
 data class ShepherdFile(

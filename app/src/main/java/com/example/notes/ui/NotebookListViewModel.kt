@@ -15,7 +15,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
@@ -27,11 +31,18 @@ class NotebookListViewModel(
     private val repository: NotesRepository
 ) : AndroidViewModel(application) {
 
+    private val _isInitialLoading = MutableStateFlow(true)
+    val isInitialLoading: StateFlow<Boolean> = _isInitialLoading.asStateFlow()
+
     val notebooks: StateFlow<List<Notebook>> = repository.observeNotebooks()
+        .onEach { _isInitialLoading.value = false }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _selectedNotebook = MutableStateFlow<Notebook?>(null)
     val selectedNotebook: StateFlow<Notebook?> = _selectedNotebook.asStateFlow()
+
+    private val _exportStatus = MutableSharedFlow<String>()
+    val exportStatus: SharedFlow<String> = _exportStatus.asSharedFlow()
 
     fun selectNotebook(notebook: Notebook?) {
         _selectedNotebook.value = notebook
@@ -117,46 +128,60 @@ class NotebookListViewModel(
     fun observePages(notebookId: String) = repository.observePagesForNotebook(notebookId)
 
     fun exportNotebookAsPdf(context: Context, notebookId: String, notebookTitle: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val notebook = repository.getNotebookById(notebookId) ?: return@launch
-            val pages = repository.observePagesForNotebook(notebookId).first()
-            val pdfDocument = PdfDocument()
-            
-            pages.sortedBy { it.pageIndex }.forEachIndexed { index, page ->
-                val elements = repository.getElementsForPage(page.id)
-                val width = 595 // A4 width in points (72 dpi)
-                val height = 842 // A4 height in points
-                
-                val pageInfo = PdfDocument.PageInfo.Builder(width, height, index).create()
-                val pdfPage = pdfDocument.startPage(pageInfo)
-                
-                // Scale rendering to fit PDF page
-                val canvas = pdfPage.canvas
-                val scale = width.toFloat() / 1080f // Assuming internal coordinate system is 1080 wide
-                canvas.scale(scale, scale)
-                
-                // Draw background style
-                PageBackgroundRenderer.draw(canvas, 1080f, 1920f, notebook.backgroundStyle)
-                
-                PageRenderer.render(context, elements, canvas)
-                pdfDocument.finishPage(pdfPage)
+        viewModelScope.launch {
+            _exportStatus.emit("Exporting Notebook...")
+            val success = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                try {
+                    val notebook = repository.getNotebookById(notebookId) ?: return@withContext false
+                    val pages = repository.observePagesForNotebook(notebookId).first()
+                    val pdfDocument = PdfDocument()
+                    
+                    pages.sortedBy { it.pageIndex }.forEachIndexed { index, page ->
+                        val elements = repository.getElementsForPage(page.id)
+                        val width = 595 // A4 width in points
+                        val height = 842 // A4 height in points
+                        
+                        val pageInfo = PdfDocument.PageInfo.Builder(width, height, index).create()
+                        val pdfPage = pdfDocument.startPage(pageInfo)
+                        
+                        val canvas = pdfPage.canvas
+                        // Scale 1080 -> 595
+                        val scale = width.toFloat() / 1080f
+                        canvas.scale(scale, scale)
+                        
+                        // Draw page background
+                        val bgPaint = android.graphics.Paint().apply { 
+                            color = try { android.graphics.Color.parseColor(page.backgroundColorHex) } catch(e: Exception) { android.graphics.Color.WHITE } 
+                        }
+                        canvas.drawRect(0f, 0f, 1080f, 1920f, bgPaint)
+                        PageBackgroundRenderer.draw(canvas, 1080f, 1920f, notebook.backgroundStyle)
+                        
+                        PageRenderer.render(context, elements, canvas)
+                        pdfDocument.finishPage(pdfPage)
+                    }
+                    
+                    val exportDir = File(context.cacheDir, "exports")
+                    if (!exportDir.exists()) exportDir.mkdirs()
+                    val file = File(exportDir, "${notebookTitle.replace(" ", "_")}.pdf")
+                    
+                    FileOutputStream(file).use { out ->
+                        pdfDocument.writeTo(out)
+                    }
+                    pdfDocument.close()
+                    
+                    viewModelScope.launch(Dispatchers.Main) {
+                        ExportHelper.shareFile(context, file, "application/pdf", "Share Notebook")
+                    }
+                    true
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    false
+                }
             }
-            
-            val exportDir = File(context.cacheDir, "exports")
-            if (!exportDir.exists()) exportDir.mkdirs()
-            val file = File(exportDir, "${notebookTitle.replace(" ", "_")}.pdf")
-            
-            try {
-                FileOutputStream(file).use { out ->
-                    pdfDocument.writeTo(out)
-                }
-                pdfDocument.close()
-                viewModelScope.launch(Dispatchers.Main) {
-                    ExportHelper.shareFile(context, file, "application/pdf", "Share Notebook")
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                pdfDocument.close()
+            if (success) {
+                _exportStatus.emit("Export Successful")
+            } else {
+                _exportStatus.emit("Export Failed")
             }
         }
     }

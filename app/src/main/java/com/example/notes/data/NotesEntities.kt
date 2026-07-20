@@ -112,7 +112,11 @@ fun PageElementEntity.toCanvasObject(): CanvasObject {
     return when (type) {
         ElementType.STROKE -> {
             val payload = moshi.adapter(StrokePayload::class.java).fromJson(payloadJson)!!
-            CanvasObject.StrokeObject(id, zIndex, true, payload.points, payload.colorHex, payload.brushWidth, payload.brushFamily)
+            val validatedPoints = payload.points.map { p ->
+                if (p.strokeUnitLength > 0 && p.strokeUnitLength.isFinite()) p
+                else p.copy(strokeUnitLength = 1f)
+            }
+            CanvasObject.StrokeObject(id, zIndex, true, validatedPoints, payload.colorHex, payload.brushWidth, payload.brushFamily)
         }
         ElementType.RICH_TEXT -> {
             val payload = moshi.adapter(RichTextPayload::class.java).fromJson(payloadJson)!!

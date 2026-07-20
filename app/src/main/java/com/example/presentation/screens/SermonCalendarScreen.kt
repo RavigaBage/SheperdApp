@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.SermonCalendarEntity
 import com.example.domain.model.ShepherdFile
+import com.example.presentation.components.keyboardAware
 import com.example.presentation.viewmodel.ShepherdViewModel
 import java.text.SimpleDateFormat
 import java.util.*
@@ -96,7 +97,7 @@ fun SermonCalendarScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Preaching Pipeline", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, color = Color(0xFF1B2B4B)) },
+                title = { Text("Sermon Pipeline", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, color = Color(0xFF1B2B4B)) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color(0xFF1B2B4B)) } },
                 actions = { IconButton(onClick = { showAddEventSheet = true }) { Icon(Icons.Default.AddCircleOutline, contentDescription = "Schedule Event", tint = Color.Black) } },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
@@ -183,15 +184,7 @@ fun SermonCalendarScreen(
             eventsList = listAll,
             initialIndex = startIndex,
             allFiles = allFiles,
-            onDismiss = { selectedEventForDetail = null },
-            onOpenPreachMode = { event ->
-                viewModel.activeViewerSermonId = event.sermonId
-                viewModel.activeViewerTitle = event.sermonTitle
-                viewModel.activeViewerAttachmentUris = event.attachmentUrisJson?.split("|") ?: emptyList()
-                viewModel.livePreachDurationMinutes = 30
-                onNavigate("preach_mode")
-                selectedEventForDetail = null
-            }
+            onDismiss = { selectedEventForDetail = null }
         )
     }
 
@@ -207,11 +200,11 @@ fun SermonCalendarScreen(
             var multiDayDays by remember { mutableStateOf(1) }
             var attachmentUris = remember { mutableStateListOf<String>() }
 
-            Column(modifier = Modifier.fillMaxWidth().padding(24.dp).verticalScroll(rememberScrollState()).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(modifier = Modifier.fillMaxWidth().padding(24.dp).verticalScroll(rememberScrollState()).imePadding(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text("Schedule Sermon Event", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color(0xFF1B2B4B))
                 HorizontalDivider(color = Color(0xFFF0F0F0))
-                OutlinedTextField(value = eventName, onValueChange = { eventName = it }, label = { Text("Event Title") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
-                OutlinedTextField(value = sermonTitle, onValueChange = { sermonTitle = it }, label = { Text("Sermon Topic") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
+                OutlinedTextField(value = eventName, onValueChange = { eventName = it }, label = { Text("Event Title") }, modifier = Modifier.fillMaxWidth().keyboardAware(), shape = RoundedCornerShape(12.dp))
+                OutlinedTextField(value = sermonTitle, onValueChange = { sermonTitle = it }, label = { Text("Sermon Topic") }, modifier = Modifier.fillMaxWidth().keyboardAware(), shape = RoundedCornerShape(12.dp))
                 
                 Text("Attachments", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 attachmentUris.forEach { uri -> Text(uri, fontSize = 11.sp, color = Color.Gray) }
@@ -253,8 +246,7 @@ fun EngagementDetailDialog(
     eventsList: List<SermonCalendarEntity>,
     initialIndex: Int,
     allFiles: List<ShepherdFile>,
-    onDismiss: () -> Unit,
-    onOpenPreachMode: (SermonCalendarEntity) -> Unit
+    onDismiss: () -> Unit
 ) {
     val pagerState = rememberPagerState(initialPage = initialIndex) { eventsList.size }
     AlertDialog(
@@ -273,13 +265,6 @@ fun EngagementDetailDialog(
                             
                             val attachmentCount = event.attachmentUrisJson?.split("|")?.filter { it.isNotBlank() }?.size ?: 0
                             Text("Attachments: $attachmentCount", fontWeight = FontWeight.Bold)
-
-                            Button(
-                                onClick = { onOpenPreachMode(event) },
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp).height(50.dp),
-                                shape = RoundedCornerShape(14.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1B2B4B))
-                            ) { Text("Launch Preach Mode", fontWeight = FontWeight.Bold) }
                         }
                     }
                 }

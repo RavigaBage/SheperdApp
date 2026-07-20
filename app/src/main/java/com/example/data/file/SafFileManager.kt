@@ -46,7 +46,7 @@ class SafFileManager(private val context: Context) {
             } else if (child.isFile) {
                 val name = child.name.orEmpty()
                 val ext = name.substringAfterLast(".", "").lowercase(Locale.ROOT)
-                if (ext in listOf("docx", "doc", "pptx", "pdf", "txt")) {
+                if (ext in listOf("docx", "doc", "pptx", "pdf", "txt", "mp3", "wav", "m4a")) {
                     outList.add(
                         ShepherdFile(
                             id = child.uri.toString(),
