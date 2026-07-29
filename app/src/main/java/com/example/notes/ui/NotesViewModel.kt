@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.ShepherdApplication
+import com.example.notes.audio.TextToSpeechManager
 import com.example.notes.domain.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
@@ -40,6 +41,13 @@ class NotesViewModel(
 
     private val _exportStatus = MutableSharedFlow<String>()
     val exportStatus: SharedFlow<String> = _exportStatus.asSharedFlow()
+
+    private val ttsManager = TextToSpeechManager(application)
+    private val _isSpeaking = MutableStateFlow(false)
+    val isSpeaking: StateFlow<Boolean> = _isSpeaking.asStateFlow()
+
+    private val _speechRate = MutableStateFlow(1.0f)
+    val speechRate: StateFlow<Float> = _speechRate.asStateFlow()
 
     private var initialObjects: List<CanvasObject> = emptyList()
     private var saveJob: Job? = null
@@ -170,40 +178,99 @@ class NotesViewModel(
         setFocusedText(newObj.id)
     }
 
-    fun insertTextFromLibrary(text: String) {
-        insertTextAt(100f, 100f, text)
-    }
+    fun insertTextFromLibrary(text: String, canvasWidthPx: Float) {
+        val activeTextObj = _canvasObjects.value.filterIsInstance<CanvasObject.RichTextObject>().lastOrNull()
+        val boxWidth = canvasWidthPx - 100f
 
-    fun insertIllustrationFromLibrary(illustration: Illustration) {
-        val activeTextObj = _canvasObjects.value.filterIsInstance<CanvasObject.RichTextObject>().lastOrNull() 
-        
         if (activeTextObj != null) {
-            val updated = activeTextObj.copy(text = activeTextObj.text + "\n" + illustration.bodyText)
+            val newText = activeTextObj.text + "\n" + text
+            val updated = activeTextObj.copy(
+                text = newText,
+                width = boxWidth,
+                height = estimateTextHeight(newText, boxWidth)
+            )
             updateCanvasObject(updated)
         } else {
-            val maxY = _canvasObjects.value.maxOfOrNull { 
-                when(it) {
+            val maxY = _canvasObjects.value.maxOfOrNull {
+                when (it) {
                     is CanvasObject.RichTextObject -> it.y + it.height
                     is CanvasObject.ImageObject -> it.y + it.height
                     is CanvasObject.IllustrationObject -> it.y + it.height
                     else -> 0f
                 }
             } ?: 100f
-            
+
             val nextZ = (_canvasObjects.value.maxOfOrNull { it.zIndex } ?: -1) + 1
             val newObj = CanvasObject.RichTextObject(
                 id = UUID.randomUUID().toString(),
                 zIndex = nextZ,
                 x = 50f,
                 y = maxY + 20f,
-                width = 500f,
-                height = 200f,
+                width = boxWidth,
+                height = estimateTextHeight(text, boxWidth),
+                text = text
+            )
+            addCanvasObject(newObj)
+        }
+    }
+
+    fun insertIllustrationFromLibrary(illustration: Illustration, canvasWidthPx: Float) {
+        val activeTextObj = _canvasObjects.value.filterIsInstance<CanvasObject.RichTextObject>().lastOrNull()
+
+        val boxWidth = canvasWidthPx - 100f // leave ~50f margin each side, matches x = 50f below
+
+        if (activeTextObj != null) {
+            val newText = activeTextObj.text + "\n" + illustration.bodyText
+            val updated = activeTextObj.copy(
+                text = newText,
+                width = boxWidth,
+                height = estimateTextHeight(newText, boxWidth)
+            )
+            updateCanvasObject(updated)
+        } else {
+            val maxY = _canvasObjects.value.maxOfOrNull {
+                when (it) {
+                    is CanvasObject.RichTextObject -> it.y + it.height
+                    is CanvasObject.ImageObject -> it.y + it.height
+                    is CanvasObject.IllustrationObject -> it.y + it.height
+                    else -> 0f
+                }
+            } ?: 100f
+
+            val nextZ = (_canvasObjects.value.maxOfOrNull { it.zIndex } ?: -1) + 1
+            val newObj = CanvasObject.RichTextObject(
+                id = UUID.randomUUID().toString(),
+                zIndex = nextZ,
+                x = 50f,
+                y = maxY + 20f,
+                width = boxWidth,
+                height = estimateTextHeight(illustration.bodyText, boxWidth),
                 text = illustration.bodyText
             )
             addCanvasObject(newObj)
         }
     }
 
+    private fun estimateTextHeight(
+        text: String,
+        boxWidth: Float,
+        fontSizePx: Float = 42f,   // tune to match your actual RichTextObject font size
+        lineHeightPx: Float = 52f, // tune to match your renderer's line spacing
+        verticalPaddingPx: Float = 40f,
+        minHeightPx: Float = 150f
+    ): Float {
+        val avgCharWidthPx = fontSizePx * 0.55f // rough average for typical fonts
+        val charsPerLine = (boxWidth / avgCharWidthPx).coerceAtLeast(1f)
+
+        // account for explicit newlines the user's text already has
+        val explicitLines = text.split("\n")
+        val totalWrappedLines = explicitLines.sumOf { line ->
+            kotlin.math.ceil(line.length / charsPerLine).toInt().coerceAtLeast(1)
+        }
+
+        val calculatedHeight = totalWrappedLines * lineHeightPx + verticalPaddingPx
+        return calculatedHeight.coerceAtLeast(minHeightPx)
+    }
     fun saveAsIllustration(title: String, elementId: String, categoryId: String?, scripture: String?) {
         val element = _canvasObjects.value.find { it.id == elementId } ?: return
         val body = when (element) {
@@ -255,6 +322,84 @@ class NotesViewModel(
             }
             onComplete()
         }
+    }
+
+    fun setSpeechRate(rate: Float) {
+        _speechRate.value = rate
+        ttsManager.setSpeechRate(rate)
+    }
+
+    fun stopReading() {
+        ttsManager.stop()
+        _isSpeaking.value = false
+    }
+
+    fun readPageAloud() {
+        val objects = _canvasObjects.value.filterIsInstance<CanvasObject.RichTextObject>()
+            .sortedBy { it.y }
+
+        if (objects.isEmpty()) {
+            viewModelScope.launch {
+                _exportStatus.emit("No text found on this page to read.")
+            }
+            return
+        }
+
+        _isSpeaking.value = true
+        ttsManager.stop() // Clear any existing queue
+
+        val listRegex = "^([-*•]|\\d+\\.)".toRegex()
+
+        objects.forEachIndexed { blockIndex, richText ->
+            val text = richText.text
+            val spans = richText.annotatedStringJson.decodeSpans().sortedBy { it.start }
+            
+            val lines = text.split("\n")
+            lines.forEachIndexed { lineIndex, line ->
+                val trimmed = line.trim()
+                if (trimmed.isEmpty()) return@forEachIndexed
+
+                // Handle bold/heading emphasis with pauses
+                // We check if the line falls within a bold span
+                // For simplicity, if any part of the line is bold, we add emphasis
+                // Calculating exact offsets in split lines:
+                val lineStartInText = text.indexOf(line) // Approximate if same line appears multiple times
+                val lineEndInText = lineStartInText + line.length
+                val hasBold = spans.any { it.bold && it.start < lineEndInText && it.end > lineStartInText }
+
+                if (hasBold) {
+                    ttsManager.playSilence(200, "bold_start_${blockIndex}_${lineIndex}")
+                }
+
+                val isListItem = listRegex.containsMatchIn(trimmed)
+                ttsManager.speak(trimmed, "line_${blockIndex}_${lineIndex}")
+                
+                if (hasBold) {
+                    ttsManager.playSilence(200, "bold_end_${blockIndex}_${lineIndex}")
+                }
+
+                if (isListItem) {
+                    ttsManager.playSilence(400, "list_pause_${blockIndex}_${lineIndex}")
+                } else {
+                    ttsManager.playSilence(100, "line_pause_${blockIndex}_${lineIndex}")
+                }
+            }
+
+            // Longer pause between separate blocks
+            if (blockIndex < objects.size - 1) {
+                ttsManager.playSilence(600, "block_pause_$blockIndex")
+            } else {
+                // Last block
+                ttsManager.playSilence(200, "final_pause") {
+                    _isSpeaking.value = false
+                }
+            }
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        ttsManager.shutdown()
     }
 
     class Factory(

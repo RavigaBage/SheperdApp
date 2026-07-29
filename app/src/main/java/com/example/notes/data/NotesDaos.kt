@@ -23,6 +23,9 @@ interface PageDao {
     @Query("SELECT * FROM pages WHERE notebookId = :notebookId ORDER BY pageIndex ASC")
     fun observePagesForNotebook(notebookId: String): Flow<List<PageEntity>>
 
+    @Query("SELECT * FROM pages WHERE notebookId = :notebookId ORDER BY pageIndex ASC")
+    suspend fun getPagesForNotebookSync(notebookId: String): List<PageEntity>
+
     @Upsert
     suspend fun upsert(page: PageEntity)
 

@@ -358,43 +358,6 @@ fun BoxScope.ResizeHandle(
 
 private data class Rect(val x: Float, val y: Float, val width: Float, val height: Float)
 
-private fun CanvasObject.StrokeObject.toStroke(): Stroke {
-    val family = when (brushFamily) {
-        "Pen" -> StockBrushes.pressurePen()
-        "Brush" -> StockBrushes.marker(StockBrushes.MarkerVersion.V1)
-        else -> StockBrushes.marker(StockBrushes.MarkerVersion.V1)
-    }
-    val brush = Brush.createWithColorIntArgb(
-        family = family,
-        colorIntArgb = try {
-            android.graphics.Color.parseColor(colorHex)
-        } catch (e: Exception) {
-            android.graphics.Color.BLACK
-        },
-        size = brushWidth,
-        epsilon = 0.1f
-    )
-    val builder = MutableStrokeInputBatch()
-    if (points.isEmpty()) {
-        builder.add(InputToolType.STYLUS, 0f, 0f, 0L, 0f, 0f, 0f)
-    } else {
-        points.forEach { p ->
-            val safeUnitLength = if (p.strokeUnitLength > 0 && p.strokeUnitLength.isFinite()) p.strokeUnitLength else 1f
-            builder.add(
-                type = InputToolType.STYLUS,
-                x = p.x,
-                y = p.y,
-                elapsedTimeMillis = p.timestampMs,
-                strokeUnitLengthCm = safeUnitLength,
-                pressure = p.pressure,
-                tiltRadians = p.tiltX,
-                orientationRadians = p.tiltY
-            )
-        }
-    }
-    return Stroke(brush, builder)
-}
-
 private fun StrokeInputBatch.toInkPoints(): List<InkPoint> {
     val points = mutableListOf<InkPoint>()
     for (i in 0 until size) {

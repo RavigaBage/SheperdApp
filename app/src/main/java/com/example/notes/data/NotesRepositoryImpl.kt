@@ -17,7 +17,10 @@ class NotesRepositoryImpl(
 
     override fun observeNotebooks(): Flow<List<Notebook>> {
         return notebookDao.observeNotebooks().map { entities ->
-            entities.map { it.toDomain() }
+            entities.map { entity ->
+                val firstPage = pageDao.getPagesForNotebookSync(entity.id).firstOrNull()
+                entity.toDomain().copy(thumbnailPath = firstPage?.thumbnailPath)
+            }
         }
     }
 
@@ -240,7 +243,7 @@ class NotesRepositoryImpl(
     }
 }
 
-fun NotebookEntity.toDomain() = Notebook(id, title, categoryId, backgroundStyle, colorHex, createdAt, updatedAt)
+fun NotebookEntity.toDomain() = Notebook(id, title, categoryId, backgroundStyle, colorHex, null, createdAt, updatedAt)
 fun Notebook.toEntity() = NotebookEntity(id, title, categoryId, backgroundStyle, colorHex, createdAt, updatedAt)
 
 fun PageEntity.toDomain() = Page(id, notebookId, pageIndex, thumbnailPath, backgroundColorHex, createdAt, updatedAt)

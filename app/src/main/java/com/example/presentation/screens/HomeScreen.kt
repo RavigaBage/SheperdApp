@@ -134,21 +134,22 @@ private fun CategoryTile(
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFEEB))
     ) {
-        Column(
+        Row(
             modifier = Modifier.fillMaxSize().padding(12.dp),
-            verticalArrangement = Arrangement.SpaceBetween
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(text = category.iconEmoji, fontSize = 16.sp)
+            Text(text = category.iconEmoji, fontSize = 24.sp)
             Column {
                 Text(
                     text = category.name,
-                    fontSize = 12.sp,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF1B2B4B),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(text = "$count items", fontSize = 9.sp, color = Color.Gray)
+                Text(text = "$count items", fontSize = 11.sp, color = Color.Gray)
             }
         }
     }

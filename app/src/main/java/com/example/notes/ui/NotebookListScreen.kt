@@ -31,6 +31,7 @@ import com.example.notes.domain.Notebook
 import com.example.notes.domain.Page
 import com.example.presentation.components.SkeletonItem
 import com.example.presentation.components.keyboardAware
+import kotlinx.coroutines.flow.onEach
 import java.io.File
 
 import androidx.compose.material.icons.filled.*
@@ -51,7 +52,7 @@ fun NotebookListScreen(
     val selectedNotebook by viewModel.selectedNotebook.collectAsState()
     val isInitialLoading by viewModel.isInitialLoading.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    
+
     LaunchedEffect(Unit) {
         viewModel.exportStatus.collect { message ->
             snackbarHostState.showSnackbar(message)
@@ -63,8 +64,15 @@ fun NotebookListScreen(
     var selectedPageIds by remember { mutableStateOf(setOf<String>()) }
 
     val currentNotebook = selectedNotebook
+
+    // Tracks whether pages are still loading for the current notebook.
+    // Keyed to the notebook id so it resets to true when switching notebooks.
+    var isPagesLoading by remember(currentNotebook?.id) { mutableStateOf(true) }
+
     val pages by if (currentNotebook != null) {
-        viewModel.observePages(currentNotebook.id).collectAsState(emptyList())
+        viewModel.observePages(currentNotebook.id)
+            .onEach { isPagesLoading = false }
+            .collectAsState(emptyList())
     } else {
         remember { mutableStateOf(emptyList<Page>()) }
     }
@@ -76,7 +84,7 @@ fun NotebookListScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { 
+                title = {
                     if (isSelectionMode) {
                         Text("${selectedPageIds.size} Selected")
                     } else {
@@ -95,7 +103,7 @@ fun NotebookListScreen(
                         }
                     }) {
                         Icon(
-                            if (isSelectionMode) Icons.Default.Close else Icons.Default.ArrowBack, 
+                            if (isSelectionMode) Icons.Default.Close else Icons.Default.ArrowBack,
                             contentDescription = "Back"
                         )
                     }
@@ -106,9 +114,9 @@ fun NotebookListScreen(
                             val selectedId = selectedPageIds.first()
                             val page = sortedPages.find { it.id == selectedId }
                             val index = sortedPages.indexOf(page)
-                            
+
                             IconButton(
-                                onClick = { 
+                                onClick = {
                                     viewModel.reorderPages(currentNotebook.id, index, index - 1)
                                 },
                                 enabled = index > 0
@@ -116,7 +124,7 @@ fun NotebookListScreen(
                                 Icon(Icons.Default.ArrowBack, contentDescription = "Move Back")
                             }
                             IconButton(
-                                onClick = { 
+                                onClick = {
                                     viewModel.reorderPages(currentNotebook.id, index, index + 1)
                                 },
                                 enabled = index < sortedPages.size - 1
@@ -182,7 +190,7 @@ fun NotebookListScreen(
                 )
             }
         } else {
-            if (pages.isEmpty()) {
+            if (isPagesLoading) {
                 // Skeleton for Pages
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(140.dp),
@@ -193,6 +201,35 @@ fun NotebookListScreen(
                 ) {
                     items(8) {
                         SkeletonItem(height = 200.dp, shape = RoundedCornerShape(8.dp))
+                    }
+                }
+            } else if (pages.isEmpty()) {
+                // Genuine empty state — no pages created yet
+                Box(
+                    modifier = Modifier.padding(paddingValues).fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Description,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = Color.LightGray
+                        )
+                        Text(
+                            "No pages yet",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = Color.Gray
+                        )
+                        Text(
+                            "Tap + to create your first page",
+                            fontSize = 13.sp,
+                            color = Color.Gray
+                        )
                     }
                 }
             } else {
@@ -462,7 +499,7 @@ fun PageGrid(
                             )
                         }
                     }
-                    
+
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)

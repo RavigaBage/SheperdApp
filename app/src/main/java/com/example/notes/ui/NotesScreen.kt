@@ -1,6 +1,8 @@
 package com.example.notes.ui
 
+import android.content.Intent
 import android.net.Uri
+import android.speech.tts.TextToSpeech
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -48,9 +50,11 @@ fun NotesScreen(
         factory = NotesViewModel.Factory(app, app.notesRepository, pageId, notebookId)
     )
 
-    LaunchedEffect(pendingInsertText) {
-        if (!pendingInsertText.isNullOrBlank()) {
-            viewModel.insertTextFromLibrary(pendingInsertText)
+    var canvasWidthPx by remember { mutableStateOf(0f) }
+
+    LaunchedEffect(pendingInsertText, canvasWidthPx) {
+        if (!pendingInsertText.isNullOrBlank() && canvasWidthPx > 0f) {
+            viewModel.insertTextFromLibrary(pendingInsertText, canvasWidthPx)
             onClearPendingInsertText()
         }
     }
@@ -59,6 +63,17 @@ fun NotesScreen(
     val canvasState by viewModel.canvasState.collectAsState()
     val backgroundStyle by viewModel.backgroundStyle.collectAsState()
     val backgroundColorHex by viewModel.backgroundColor.collectAsState()
+    val isSpeaking by viewModel.isSpeaking.collectAsState()
+    val speechRate by viewModel.speechRate.collectAsState()
+
+    val ttsCheckLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        // We don't strictly need to check the result here because 
+        // the ViewModel's readPageAloud will try anyway if it can,
+        // but it's good practice.
+        viewModel.readPageAloud()
+    }
     val backgroundColor = remember(backgroundColorHex) { Color(backgroundColorHex.toColorInt()) }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -101,6 +116,68 @@ fun NotesScreen(
                     }
                 },
                 actions = {
+                    val isSpeaking by viewModel.isSpeaking.collectAsState()
+                    var showSpeedMenu by remember { mutableStateOf(false) }
+
+                    Box {
+                        IconButton(onClick = {
+                            if (isSpeaking) {
+                                viewModel.stopReading()
+                            } else {
+                                val checkIntent = Intent(TextToSpeech.Engine.ACTION_CHECK_TTS_DATA)
+                                try {
+                                    ttsCheckLauncher.launch(checkIntent)
+                                } catch (e: Exception) {
+                                    // Fallback if intent fails
+                                    viewModel.readPageAloud()
+                                }
+                            }
+                        }) {
+                            Icon(
+                                if (isSpeaking) Icons.Default.StopCircle else Icons.Default.VolumeUp,
+                                contentDescription = if (isSpeaking) "Stop Reading" else "Read Aloud"
+                            )
+                        }
+                        
+                        // Long press or just a small dropdown next to it? 
+                        // User suggested dropdown or long-press. 
+                        // Let's use a simple dropdown menu anchor if they click a small arrow or long press.
+                        // For simplicity, let's just add a long-click or a separate small button.
+                        // Actually, let's just make it a dropdown that opens on long click if possible,
+                        // but standard IconButton doesn't support long click easily without Modifier.
+                    }
+
+                    Box {
+                        IconButton(onClick = { showSpeedMenu = true }) {
+                            Icon(Icons.Default.Speed, contentDescription = "Speech Speed")
+                        }
+                        DropdownMenu(
+                            expanded = showSpeedMenu,
+                            onDismissRequest = { showSpeedMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("0.5x (Slow)") },
+                                onClick = { viewModel.setSpeechRate(0.5f); showSpeedMenu = false },
+                                leadingIcon = { if (speechRate == 0.5f) Icon(Icons.Default.Check, null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("1.0x (Normal)") },
+                                onClick = { viewModel.setSpeechRate(1.0f); showSpeedMenu = false },
+                                leadingIcon = { if (speechRate == 1.0f) Icon(Icons.Default.Check, null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("1.5x (Fast)") },
+                                onClick = { viewModel.setSpeechRate(1.5f); showSpeedMenu = false },
+                                leadingIcon = { if (speechRate == 1.5f) Icon(Icons.Default.Check, null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("2.0x (Very Fast)") },
+                                onClick = { viewModel.setSpeechRate(2.0f); showSpeedMenu = false },
+                                leadingIcon = { if (speechRate == 2.0f) Icon(Icons.Default.Check, null) }
+                            )
+                        }
+                    }
+
                     IconButton(onClick = { viewModel.savePage() }) {
                         Icon(Icons.Default.Save, contentDescription = "Save")
                     }

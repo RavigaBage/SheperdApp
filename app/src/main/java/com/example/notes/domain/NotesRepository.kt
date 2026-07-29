@@ -47,6 +47,7 @@ data class Notebook(
     val categoryId: String? = null,
     val backgroundStyle: PageBackgroundStyle = PageBackgroundStyle.LINED,
     val colorHex: String = "#FFFFFF",
+    val thumbnailPath: String? = null,
     val createdAt: Long,
     val updatedAt: Long
 )
